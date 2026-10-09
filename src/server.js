@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import { pool } from './db/pool.js';
 import { app } from './app.js';
-import { seedDatabase } from './db/seed-db.js';
+import { ensureOperatorCompany, seedDatabase } from './db/seed-db.js';
 import { applyMigrations, applyTenantViews, prepareSchema } from './db/migrations.js';
 
 const port = process.env.NODE_ENV === 'production' ? Number(process.env.PORT || 3000) : 3000;
@@ -20,11 +20,11 @@ async function start() {
     : 'Los datos de demostración ya estaban cargados; no se agregaron duplicados.');
   await applyMigrations(pool);
   await applyTenantViews(pool);
-  const company = await pool.privilegedQuery(
-    'SELECT company_id FROM company_settings ORDER BY company_id LIMIT 1'
-  );
-  if (!company.rowCount) throw new Error('Configura una empresa operadora en PostgreSQL antes de iniciar el sistema.');
-  pool.setOperatorCompanyId(company.rows[0].company_id);
+  const operatorCompany = await ensureOperatorCompany(pool);
+  if (operatorCompany.created) {
+    console.warn('No se encontró una empresa configurada; se creó la empresa demo inicial para el operador.');
+  }
+  pool.setOperatorCompanyId(operatorCompany.companyId);
   await pool.query('SELECT 1');
   app.listen(port, () => console.log(`Renta al Día disponible en http://localhost:${port}`));
 }
