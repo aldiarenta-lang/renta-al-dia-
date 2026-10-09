@@ -865,8 +865,6 @@ export async function importExcelMappings(pool, token, mappings, replaceExisting
   try {
     await client.query('BEGIN');
     await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
-    await client.query('SET LOCAL ROLE rda_tenant_runtime');
-    await client.query("SELECT set_config('app.company_id', $1, true)", [companyId]);
     if (replaceExisting) {
       for (const table of [
         'sales', 'service_costs', 'expenses', 'payroll', 'investments_financing',

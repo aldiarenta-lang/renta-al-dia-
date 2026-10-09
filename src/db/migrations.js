@@ -18,7 +18,8 @@ export async function applyMigrations(pool) {
     '002_restricted_runtime_role',
     '003_company_profile_permissions',
     '004_financial_report_permission',
-    '005_single_operator'
+    '005_single_operator',
+    '006_single_operator_no_rls'
   ]) {
     const applied = await pool.query('SELECT 1 FROM schema_migrations WHERE name = $1', [name]);
     if (applied.rowCount) continue;

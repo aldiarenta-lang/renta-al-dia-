@@ -12,6 +12,8 @@ El Dashboard está en `/` (la antigua ruta `/dashboard` sigue disponible por com
 
 Si PostgreSQL no tiene una empresa operadora, el arranque crea una empresa demo y su configuración inicial de forma idempotente, muestra un aviso en consola y continúa. Los datos existentes no se reemplazan.
 
+La aplicación es de operador único y no utiliza Row Level Security. Al iniciar, las migraciones eliminan las políticas RLS anteriores en las tablas de la aplicación y desactivan esa capa en PostgreSQL.
+
 ## Producción y dominios
 
 La aplicación no depende del nombre del host. Al publicar el servicio Node en Render, `https://renta-al-dia.onrender.com/` abre directamente el Dashboard. También puede ejecutarse detrás de un proxy TLS, apuntando el host a la misma instancia. En Docker, la aplicación escucha en el puerto interno `3000`; `APP_PORT` configura el puerto externo publicado por Compose.

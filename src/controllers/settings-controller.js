@@ -25,8 +25,6 @@ export async function updateSettings(req, res) {
     const fields = Object.keys(settingsFields);
     const assignments = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
     await client.query('BEGIN');
-    await client.query('SET LOCAL ROLE rda_tenant_runtime');
-    await client.query("SELECT set_config('app.company_id', $1, true)", [req.operator.companyId]);
     await client.query(
       `INSERT INTO company_settings (company_id, id, ${fields.join(', ')})
        VALUES ($${fields.length + 1}, true, ${fields.map((_, index) => `$${index + 1}`).join(', ')})
