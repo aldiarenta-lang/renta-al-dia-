@@ -50,13 +50,11 @@ const modules = [
   { id: 'taxes', title: 'Impuestos', group: 'Análisis', icon: 'calculator', description: 'Registra obligaciones, pagos y saldos, y consulta estimaciones tributarias calculadas con los datos guardados.' },
   { id: 'forecast', title: 'Proyección a 9 meses', group: 'Análisis', icon: 'chart', description: 'Proyecta nueve meses a partir de promedios observados y tasas de crecimiento editables.' },
   { id: 'catalog-options', title: 'Catálogos', group: 'Configuración', icon: 'list', description: 'Mantén listas de opciones propias para facilitar el registro de la operación.' },
-  { id: 'import-excel', title: 'Importar Excel', group: 'Administración', icon: 'file', description: 'Revisa, valida y migra las hojas del libro original a PostgreSQL.' },
-  { id: 'users', title: 'Usuarios y roles', group: 'Administración', icon: 'people', description: 'Administra los accesos de los empleados de tu empresa.' },
-  { id: 'companies', title: 'Empresas y licencias', group: 'Administración', icon: 'building', description: 'Administra las empresas, planes y licencias de la plataforma.' }
+  { id: 'import-excel', title: 'Importar Excel', group: 'Administración', icon: 'file', description: 'Revisa, valida y migra las hojas del libro original a PostgreSQL.' }
 ];
 
 const modulePaths = {
-  dashboard: '/dashboard',
+  dashboard: '/',
   inicio: '/guia',
   summary: '/resumen',
   parameters: '/configuracion',
@@ -74,20 +72,10 @@ const modulePaths = {
   taxes: '/impuestos',
   forecast: '/proyeccion',
   'catalog-options': '/catalogos',
-  'import-excel': '/importar-excel',
-  users: '/usuarios',
-  companies: '/empresas'
+  'import-excel': '/importar-excel'
 };
 const pathModules = new Map(Object.entries(modulePaths).map(([module, route]) => [route, module]));
-const portalRoutes = {
-  '/admin': { role: 'super_admin', module: 'companies' },
-  '/contador': { role: 'accountant', module: 'results' },
-  '/asesor': { role: 'financial_advisor', module: 'summary' },
-  '/cliente': { role: 'company_admin', module: 'dashboard' },
-  '/auxiliar': { role: 'admin_assistant', module: 'dashboard' }
-};
-const authViewPaths = { home: '/', login: '/login', register: '/registro', forgot: '/recuperar', reset: '/restablecer' };
-const authPathViews = new Map(Object.entries(authViewPaths).map(([view, route]) => [route, view]));
+pathModules.set('/dashboard', 'dashboard');
 
 const displayNames = {
   client_nit: 'NIT', name: 'Nombre / razón social', address: 'Dirección', municipality: 'Municipio', client_type: 'Tipo de cliente',
@@ -268,41 +256,6 @@ let settingsCache = null;
 let modalContext = null;
 let searchTimer = null;
 let excelImportState = null;
-let authState = null;
-
-const modulePermissions = {
-  summary: 'reports:read',
-  parameters: 'settings:read',
-  'service-prices': 'service-prices:read',
-  'budget-control': 'budget-control:read',
-  sales: 'sales:read',
-  'direct-costs': 'direct-costs:read',
-  expenses: 'expenses:read',
-  payroll: 'payroll:read',
-  'investments-financing': 'investments-financing:read',
-  clients: 'clients:read',
-  'break-even': 'reports:read',
-  cashflow: 'financial-reports:read',
-  results: 'financial-reports:read',
-  taxes: 'tax-records:read',
-  forecast: 'financial-reports:read',
-  'catalog-options': 'catalogs:manage',
-  'import-excel': 'excel:import',
-  users: 'users:read',
-  companies: 'companies:manage'
-};
-
-const roleLabels = {
-  super_admin: 'Super Administrador',
-  company_admin: 'Administrador de empresa',
-  accountant: 'Contador',
-  financial_advisor: 'Asesor Financiero',
-  admin_assistant: 'Auxiliar Administrativo'
-};
-
-function can(permission) {
-  return authState?.permissions.includes(permission) || false;
-}
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -318,11 +271,6 @@ async function api(path, options = {}) {
   let response;
   try {
     const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-    const companyId = authState?.user?.companyId || localStorage.getItem('rda-company-id');
-    if (companyId) headers['X-Company-Id'] = companyId;
-    if (authState?.csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(options.method || 'GET')) {
-      headers['X-CSRF-Token'] = authState.csrfToken;
-    }
     response = await fetch(`/api/${path}`, {
       ...options,
       headers
@@ -350,19 +298,9 @@ function pathForModule(id) {
   return modulePaths[id] || modulePaths.dashboard;
 }
 
-function roleHomePath() {
-  return {
-    super_admin: '/admin',
-    company_admin: '/cliente',
-    accountant: '/contador',
-    financial_advisor: '/asesor',
-    admin_assistant: '/auxiliar'
-  }[authState?.user?.role] || '/dashboard';
-}
-
 function renderNavigation() {
   const navigation = document.getElementById('main-navigation');
-  const visibleModules = modules.filter((module) => !modulePermissions[module.id] || can(modulePermissions[module.id]));
+  const visibleModules = modules;
   const groups = [...new Set(visibleModules.map((module) => module.group))];
   navigation.innerHTML = groups.map((group) => {
     const links = visibleModules.filter((module) => module.group === group).map((module) =>
@@ -615,28 +553,22 @@ function distinctFilters(rows, columns) {
 }
 
 function renderEntityTable(rows, columns, resource) {
-  const permissionResource = resource === 'catalog-options' ? 'catalogs' : resource;
-  const canWrite = can(`${permissionResource}:write`) || (resource === 'catalog-options' && can('catalogs:manage'));
-  const canDelete = can(`${permissionResource}:delete`) || (resource === 'catalog-options' && can('catalogs:manage'));
-  const hasActions = canWrite || canDelete;
   const head = columns.map((key) => `<th scope="col">${escapeHtml(displayNames[key] || key)}</th>`).join('');
   if (!rows.length) {
-    return `<div class="empty-state"><strong>No hay registros para mostrar</strong><p>Los datos aparecerán aquí cuando guardes el primer registro. La lista se lee directamente desde PostgreSQL.</p>${canWrite ? `<button class="button button-primary" data-action="create">${svg('plus')} Crear registro</button>` : ''}</div>`;
+    return `<div class="empty-state"><strong>No hay registros para mostrar</strong><p>Los datos aparecerán aquí cuando guardes el primer registro. La lista se lee directamente desde PostgreSQL.</p><button class="button button-primary" data-action="create">${svg('plus')} Crear registro</button></div>`;
   }
   const body = rows.map((row) => `<tr>${columns.map((key) => `<td title="${escapeHtml(row[key] ?? '')}">${displayValue(key, row[key])}</td>`).join('')}
-    ${hasActions ? `<td class="actions-cell"><span class="row-actions">
-      ${canWrite ? `<button class="row-action" type="button" data-action="edit" data-id="${escapeHtml(row.id ?? row[resource === 'clients' ? 'client_nit' : 'service_code'])}" aria-label="Editar registro">${svg('edit')}</button>` : ''}
-      ${canDelete ? `<button class="row-action delete" type="button" data-action="delete" data-id="${escapeHtml(row.id ?? row[resource === 'clients' ? 'client_nit' : 'service_code'])}" aria-label="Eliminar registro">${svg('trash')}</button>` : ''}
-    </span></td>` : ''}</tr>`).join('');
-  return `<div class="table-wrap"><table class="data-table"><thead><tr>${head}${hasActions ? '<th class="actions-cell" scope="col">Acciones</th>' : ''}</tr></thead><tbody>${body}</tbody></table></div>
+    <td class="actions-cell"><span class="row-actions">
+      <button class="row-action" type="button" data-action="edit" data-id="${escapeHtml(row.id ?? row[resource === 'clients' ? 'client_nit' : 'service_code'])}" aria-label="Editar registro">${svg('edit')}</button>
+      <button class="row-action delete" type="button" data-action="delete" data-id="${escapeHtml(row.id ?? row[resource === 'clients' ? 'client_nit' : 'service_code'])}" aria-label="Eliminar registro">${svg('trash')}</button>
+    </span></td></tr>`).join('');
+  return `<div class="table-wrap"><table class="data-table"><thead><tr>${head}<th class="actions-cell" scope="col">Acciones</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="table-footer"><span>Mostrando ${rows.length} registro${rows.length === 1 ? '' : 's'}${rows.length === 5000 ? ' · límite de consulta alcanzado' : ''}</span><span>Persistencia: PostgreSQL</span></div>`;
 }
 
 function buildEntityPage(module, resource, rows, search = '') {
   const columns = tableColumns[resource];
-  const permissionResource = resource === 'catalog-options' ? 'catalogs' : resource;
-  const canWrite = can(`${permissionResource}:write`) || (resource === 'catalog-options' && can('catalogs:manage'));
-  const action = canWrite ? `<button class="button button-primary" type="button" data-action="create">${svg('plus')} Nuevo registro</button>` : '';
+  const action = `<button class="button button-primary" type="button" data-action="create">${svg('plus')} Nuevo registro</button>`;
   return `${pageHeading(module, action)}
     <section class="card" id="entity-card">
       <div class="toolbar"><div class="toolbar-left"><div class="search-wrap">${svg('search')}<input class="input search-input" id="record-search" type="search" placeholder="Buscar registros…" value="${escapeHtml(search)}" aria-label="Buscar registros"></div>
@@ -730,67 +662,6 @@ function renderExcelImport(module) {
     ${progress}${state?.error ? `<div class="form-error" role="alert">${escapeHtml(state.error)}</div>` : ''}
     ${state?.fileName ? `<p class="excel-file-name">Libro seleccionado: <strong>${escapeHtml(state.fileName)}</strong></p>` : ''}
     ${validation}${sheets}${results}`;
-}
-
-function renderUsersPage(module, users) {
-  const roles = authState.user.isSuperAdmin
-    ? [['company_admin', 'Administrador de empresa'], ['accountant', 'Contador'], ['financial_advisor', 'Asesor Financiero'], ['admin_assistant', 'Auxiliar Administrativo']]
-    : [['accountant', 'Contador'], ['financial_advisor', 'Asesor Financiero'], ['admin_assistant', 'Auxiliar Administrativo']];
-  const roleOptions = roles.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
-  const rows = users.map((user) => `<tr><td>${escapeHtml(user.full_name)}</td><td>${escapeHtml(user.email)}</td>
-    <td><form class="user-role-form" data-user-id="${escapeHtml(user.id)}"><select class="select" name="role">${roles.map(([value, label]) =>
-      `<option value="${value}"${user.role_id === value ? ' selected' : ''}>${label}</option>`).join('')}</select><button class="button button-secondary" type="submit">Guardar rol</button></form></td>
-    <td>${user.user_active && user.membership_active ? 'Activo' : 'Inactivo'}</td><td>
-      <button class="button button-secondary" type="button" data-action="toggle-user" data-id="${escapeHtml(user.id)}" data-active="${user.membership_active}">
-        ${user.membership_active ? 'Desactivar' : 'Activar'}</button></td></tr>`).join('');
-  return `${pageHeading(module)}<section class="card"><div class="card-heading"><div><h2>Agregar usuario interno</h2><p class="card-subtitle">El usuario recibirá el rol y acceso de esta empresa. La contraseña inicial debe cambiarse después del primer acceso.</p></div></div>
-    <div class="card-body"><form id="user-create-form" class="admin-form">
-      <label class="field"><span>Nombre completo</span><input class="input" name="fullName" maxlength="180" required></label>
-      <label class="field"><span>Correo</span><input class="input" name="email" type="email" maxlength="254" required></label>
-      <label class="field"><span>Rol</span><select class="select" name="role" required>${roleOptions}</select></label>
-      <label class="field"><span>Contraseña inicial (mínimo 12 caracteres)</span><input class="input" name="password" type="password" minlength="12" required></label>
-      <button class="button button-primary" type="submit">Crear acceso</button></form></div></section>
-    <section class="card admin-list-card"><div class="card-heading"><div><h2>Usuarios de ${escapeHtml(authState.user.companyName)}</h2><p class="card-subtitle">${users.length} accesos registrados</p></div></div>
-      <div class="card-body"><div class="table-wrap"><table class="data-table"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="5">No hay usuarios asociados a esta empresa.</td></tr>'}</tbody></table></div></div></section>`;
-}
-
-function renderCompaniesPage(module, companies, plans) {
-  const rows = companies.map((company) => `<tr><td>${escapeHtml(company.name)}</td><td>${escapeHtml(company.tax_id)}</td>
-    <td>${escapeHtml(company.plan_name || 'Sin plan')}</td><td>${escapeHtml(company.license_status || 'Sin licencia')}</td>
-    <td>${company.active ? 'Activa' : 'Bloqueada'}</td><td><button class="button button-secondary" type="button" data-action="toggle-company" data-id="${escapeHtml(company.id)}" data-active="${company.active}">
-      ${company.active ? 'Bloquear' : 'Activar'}</button></td></tr>`).join('');
-  const planOptions = plans.map((plan) => `<option value="${escapeHtml(plan.id)}">${escapeHtml(plan.name)} · ${formatMoney(plan.monthly_price)}</option>`).join('');
-  const companyOptions = companies.map((company) => `<option value="${escapeHtml(company.id)}">${escapeHtml(company.name)}</option>`).join('');
-  return `${pageHeading(module)}
-    <section class="card"><div class="card-heading"><div><h2>Crear empresa</h2><p class="card-subtitle">Cada empresa tiene un espacio de datos independiente.</p></div></div>
-    <div class="card-body"><form id="company-create-form" class="admin-form">
-      <label class="field"><span>Empresa</span><input class="input" name="name" maxlength="180" required></label>
-      <label class="field"><span>NIT</span><input class="input" name="taxId" maxlength="32" required></label>
-      <label class="field"><span>Representante</span><input class="input" name="representative" maxlength="180"></label>
-      <label class="field"><span>Correo</span><input class="input" name="email" type="email" maxlength="254"></label>
-      <label class="field"><span>Teléfono</span><input class="input" name="phone" maxlength="40"></label>
-      <label class="field"><span>Ciudad</span><input class="input" name="municipality" maxlength="100"></label>
-      <button class="button button-primary" type="submit">Crear empresa</button></form></div></section>
-    <section class="card admin-list-card"><div class="card-heading"><div><h2>Planes y precios</h2><p class="card-subtitle">Configura nombres, valores mensuales y características que utilizará cada licencia.</p></div></div>
-    <div class="card-body"><form id="plan-create-form" class="admin-form">
-      <label class="field"><span>Nombre del plan</span><input class="input" name="name" maxlength="100" required></label>
-      <label class="field"><span>Precio mensual (COP)</span><input class="input" name="monthlyPrice" type="number" min="0" step="1" required></label>
-      <label class="field"><span>Descripción</span><input class="input" name="description" maxlength="1000"></label>
-      <label class="field"><span>Características (separadas por coma)</span><input class="input" name="features"></label>
-      <button class="button button-primary" type="submit">Guardar plan</button></form>
-      <div class="table-wrap"><table class="data-table"><thead><tr><th>Plan</th><th>Descripción</th><th>Precio mensual</th><th>Características</th></tr></thead>
-      <tbody>${plans.map((plan) => `<tr><td>${escapeHtml(plan.name)}</td><td>${escapeHtml(plan.description)}</td><td>${formatMoney(plan.monthly_price)}</td><td>${escapeHtml(plan.features.join(', '))}</td></tr>`).join('') || '<tr><td colspan="4">Aún no hay planes configurados.</td></tr>'}</tbody></table></div>
-      <form id="license-create-form" class="admin-form license-form">
-        <label class="field"><span>Empresa</span><select class="select" name="companyId" required>${companyOptions}</select></label>
-        <label class="field"><span>Plan</span><select class="select" name="planId" required>${planOptions}</select></label>
-        <label class="field"><span>Estado</span><select class="select" name="status"><option value="active">Activa</option><option value="suspended">Suspendida</option><option value="expired">Vencida</option></select></label>
-        <label class="field"><span>Inicio</span><input class="input" name="startsAt" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
-        <label class="field"><span>Vencimiento (opcional)</span><input class="input" name="endsAt" type="date"></label>
-        <button class="button button-secondary" type="submit">Asignar licencia</button></form></div></section>
-    <section class="card admin-list-card"><div class="card-heading"><div><h2>Empresas registradas</h2><p class="card-subtitle">${companies.length} empresas</p></div></div>
-    <div class="card-body"><div class="table-wrap"><table class="data-table"><thead><tr><th>Empresa</th><th>NIT</th><th>Plan</th><th>Licencia</th><th>Estado</th><th>Acciones</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="6">No hay empresas registradas.</td></tr>'}</tbody></table></div></div></section>`;
 }
 
 function renderSummary(module, data) {
@@ -1009,19 +880,16 @@ function renderSettingsPage(module, settings) {
     ? `<div class="configuration-banner"><div>${svg('chart')}</div><div><strong>Parámetros guardados en PostgreSQL</strong><p>Última actualización: ${escapeHtml(formatDate(settings.updated_at))}. Costo hora profesional calculado: ${formatMoney(settings.cost_per_hour)} con base en nómina y horas facturables.</p></div></div>`
     : configurationBanner('Completa y guarda los datos de empresa y las tasas para habilitar informes y cálculos de nómina.');
   return `${pageHeading(module)}${configuredMessage}<form id="settings-form"><div class="settings-grid">${groups}</div>
-    ${can('settings:manage') ? `<div class="form-actions"><button class="button button-primary" type="submit">${svg('plus')} Guardar parámetros</button></div>` : ''}</form>`;
+    <div class="form-actions"><button class="button button-primary" type="submit">${svg('plus')} Guardar parámetros</button></div></form>`;
 }
 
 async function showModule(route, { search = '' } = {}) {
   window.clearTimeout(searchTimer);
   let module = modules.find((item) => item.id === route) || modules[0];
-  if (modulePermissions[module.id] && !can(modulePermissions[module.id])) {
-    module = modules.find((item) => !modulePermissions[item.id] || can(modulePermissions[item.id])) || modules[0];
-  }
   currentModule = module.id;
   currentResource = module.id === 'taxes'
     ? 'tax-records'
-    : ['inicio', 'parameters', 'dashboard', 'summary', 'results', 'cashflow', 'forecast', 'break-even', 'import-excel', 'users', 'companies'].includes(module.id)
+    : ['inicio', 'parameters', 'dashboard', 'summary', 'results', 'cashflow', 'forecast', 'break-even', 'import-excel'].includes(module.id)
       ? null
       : module.id;
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.route === module.id));
@@ -1069,13 +937,6 @@ async function showModule(route, { search = '' } = {}) {
       content.innerHTML = renderBreakEven(module, report);
     } else if (module.id === 'import-excel') {
       content.innerHTML = renderExcelImport(module);
-    } else if (module.id === 'users') {
-      content.innerHTML = renderUsersPage(module, await api('users'));
-    } else if (module.id === 'companies') {
-      const [companies, plans] = await Promise.all([api('companies'), api('plans')]);
-      authState.companies = companies.map(({ id, name }) => ({ id, name }));
-      renderUserMenu();
-      content.innerHTML = renderCompaniesPage(module, companies, plans);
     } else {
       const query = search ? `?q=${encodeURIComponent(search)}` : '';
       currentRows = await api(`${currentResource}${query}`);
@@ -1102,31 +963,14 @@ function normalizePath(pathname) {
 
 function moduleForPath(pathname) {
   const path = normalizePath(pathname);
-  return pathModules.get(path) || portalRoutes[path]?.module || null;
+  return pathModules.get(path) || null;
 }
 
-function renderUnauthenticatedRoute() {
-  const view = authPathViews.get(normalizePath(location.pathname)) || 'login';
-  renderAuthScreen(view);
-}
-
-async function renderAuthenticatedRoute() {
+function renderRoute() {
   const path = normalizePath(location.pathname);
-  const portal = portalRoutes[path];
-  if (portal && portal.role !== authState.user.role) {
-    navigateTo(roleHomePath(), { replace: true });
-    return;
-  }
-  if (path === '/' || authPathViews.has(path)) {
-    navigateTo(roleHomePath(), { replace: true });
-    return;
-  }
-  const module = moduleForPath(path);
-  if (!module) {
-    navigateTo(roleHomePath(), { replace: true });
-    return;
-  }
-  await showModule(module);
+  const module = moduleForPath(path) || 'dashboard';
+  if (!moduleForPath(path)) history.replaceState(null, '', pathForModule(module));
+  void showModule(module);
 }
 
 function navigateTo(destination, { replace = false } = {}) {
@@ -1136,8 +980,7 @@ function navigateTo(destination, { replace = false } = {}) {
   if (nextUrl !== `${location.pathname}${location.search}`) {
     history[replace ? 'replaceState' : 'pushState'](null, '', nextUrl);
   }
-  if (authState) void renderAuthenticatedRoute();
-  else renderUnauthenticatedRoute();
+  renderRoute();
 }
 
 function readExcelMappingsFromPage() {
@@ -1451,56 +1294,11 @@ function bindEvents() {
     if (action === 'retry') await showModule(currentModule);
     if (action === 'validate-excel') await validateExcelImport();
     if (action === 'import-excel') await runExcelImport();
-    if (action === 'toggle-user') {
-      try {
-        await api(`users/${encodeURIComponent(button.dataset.id)}`, {
-          method: 'PUT',
-          body: JSON.stringify({ active: button.dataset.active !== 'true' })
-        });
-        await showModule('users');
-      } catch (error) {
-        toast(error.message, true);
-      }
-    }
-    if (action === 'toggle-company') {
-      try {
-        await api(`companies/${encodeURIComponent(button.dataset.id)}`, {
-          method: 'PUT',
-          body: JSON.stringify({ active: button.dataset.active !== 'true' })
-        });
-        authState = await api('auth/session');
-        await showModule('companies');
-      } catch (error) {
-        toast(error.message, true);
-      }
-    }
     if (action === 'reset-excel') {
       excelImportState = null;
       await showModule('import-excel');
     }
   });
-  document.getElementById('user-menu').addEventListener('click', async (event) => {
-    if (event.target.closest('[data-action="change-password"]')) openPasswordChange();
-    if (event.target.closest('[data-action="logout"]')) await signOut();
-  });
-  document.getElementById('company-switcher').addEventListener('change', async (event) => {
-    localStorage.setItem('rda-company-id', event.target.value);
-    try {
-      authState = await api('auth/session');
-      renderUserMenu();
-      renderNavigation();
-      settingsCache = null;
-      await loadSettings();
-      await showModule(currentModule);
-    } catch (error) {
-      toast(error.message, true);
-    }
-  });
-  document.getElementById('auth-screen').addEventListener('click', (event) => {
-    const link = event.target.closest('[data-auth-view]');
-    if (link) navigateTo(authViewPaths[link.dataset.authView] || '/');
-  });
-  document.getElementById('auth-screen').addEventListener('submit', handleAuthSubmit);
   document.getElementById('main-content').addEventListener('input', (event) => {
     if (event.target.id !== 'record-search') return;
     const search = event.target.value;
@@ -1518,7 +1316,6 @@ function bindEvents() {
       }
     }, 280);
   });
-  document.getElementById('main-content').addEventListener('submit', handleAdminSubmit);
   document.getElementById('main-content').addEventListener('change', (event) => {
     if (event.target.id === 'excel-file') {
       void uploadExcel(event.target.files?.[0]);
@@ -1549,8 +1346,7 @@ function bindEvents() {
     updateVisibleEntityRows();
   });
   window.addEventListener('popstate', () => {
-    if (authState) void renderAuthenticatedRoute();
-    else renderUnauthenticatedRoute();
+    renderRoute();
   });
 }
 
@@ -1565,247 +1361,17 @@ function updateVisibleEntityRows() {
   if (meta) meta.textContent = `${filtered.length} registro${filtered.length === 1 ? '' : 's'}`;
 }
 
-async function handleAdminSubmit(event) {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement)) return;
-  const routes = {
-    'user-create-form': { path: 'users', method: 'POST', parse: (data) => data },
-    'user-role-form': { path: `users/${form.dataset.userId}`, method: 'PUT', parse: (data) => ({ role: data.role }) },
-    'company-create-form': { path: 'companies', method: 'POST', parse: (data) => data },
-    'plan-create-form': {
-      path: 'plans',
-      method: 'POST',
-      parse: (data) => ({ ...data, monthlyPrice: Number(data.monthlyPrice), features: data.features.split(',').map((feature) => feature.trim()).filter(Boolean) })
-    },
-    'license-create-form': {
-      path: `companies/${encodeURIComponent(new FormData(form).get('companyId'))}/licenses`,
-      method: 'POST',
-      parse: (data) => ({ planId: data.planId, status: data.status, startsAt: data.startsAt, endsAt: data.endsAt || null })
-    }
-  };
-  const route = routes[form.id];
-  if (!route) return;
-  event.preventDefault();
-  const submit = form.querySelector('[type="submit"]');
-  submit.disabled = true;
-  try {
-    const values = Object.fromEntries(new FormData(form));
-    await api(route.path, { method: route.method, body: JSON.stringify(route.parse(values)) });
-    if (form.id === 'company-create-form') authState = await api('auth/session');
-    toast(form.id === 'user-create-form' ? 'Usuario agregado a la empresa.'
-      : form.id === 'user-role-form' ? 'Rol actualizado.'
-        : form.id === 'company-create-form' ? 'Empresa creada.'
-          : form.id === 'plan-create-form' ? 'Plan guardado.'
-            : 'Licencia asignada.');
-    await showModule(currentModule);
-  } catch (error) {
-    toast(error.message, true);
-  } finally {
-    submit.disabled = false;
-  }
-}
-
 async function start() {
   bindEvents();
-  try {
-    try {
-      authState = await api('auth/session');
-    } catch (error) {
-      if (error.status !== 403) throw error;
-      localStorage.removeItem('rda-company-id');
-      authState = await api('auth/session');
-    }
-    if (authState) await enterApplication();
-  } catch (error) {
-    if (error.status === 401 || error.status === 403) {
-      authState = null;
-      renderUnauthenticatedRoute();
-      return;
-    }
-    setConnection(false, 'Error de conexión con PostgreSQL');
-    renderAuthScreen('login', error.message);
-  }
-}
-
-function renderUserMenu() {
-  const menu = document.getElementById('user-menu');
-  const settingsShortcut = document.querySelector('.settings-shortcut');
-  menu.hidden = !authState;
-  settingsShortcut.hidden = !can('settings:read');
-  if (!authState) return;
-  document.getElementById('user-name').textContent = authState.user.fullName;
-  document.getElementById('user-role').textContent =
-    `${roleLabels[authState.user.role] || authState.user.role} · ${authState.user.companyName}`;
-  document.getElementById('user-avatar').textContent = authState.user.fullName
-    .split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-  const companyWrap = document.getElementById('company-switcher-wrap');
-  companyWrap.hidden = authState.companies.length < 2;
-  if (authState.companies.length > 1) {
-    const select = document.getElementById('company-switcher');
-    select.innerHTML = authState.companies.map((company) =>
-      `<option value="${escapeHtml(company.id)}"${company.id === authState.user.companyId ? ' selected' : ''}>${escapeHtml(company.name)}</option>`
-    ).join('');
-  }
-}
-
-function renderAuthScreen(view = 'home', message = '') {
-  const authScreen = document.getElementById('auth-screen');
-  authScreen.hidden = false;
-  document.querySelector('.app-shell').hidden = true;
-  const token = new URLSearchParams(location.search).get('token') || '';
-  const logo = '<img src="/assets/logo.jpeg" alt="Logotipo de Renta al Día">';
-  const alert = message ? `<div class="form-error" role="alert">${escapeHtml(message)}</div>` : '';
-  const links = `<div class="auth-links"><button type="button" class="page-link" data-auth-view="login">Iniciar sesión</button><button type="button" class="page-link" data-auth-view="register">Registrar empresa</button></div>`;
-  let content;
-  if (view === 'register') {
-    content = `<section class="auth-card"><h1>Registra tu empresa</h1><p>Crea un espacio financiero independiente para tu organización.</p>${alert}
-      <form id="register-form" class="auth-form">
-        <label class="field"><span>Nombre de la empresa</span><input class="input" name="companyName" maxlength="180" required></label>
-        <label class="field"><span>NIT</span><input class="input" name="taxId" maxlength="32" required></label>
-        <label class="field"><span>Representante</span><input class="input" name="representative" maxlength="180" required></label>
-        <label class="field"><span>Correo</span><input class="input" name="email" type="email" maxlength="254" autocomplete="email" required></label>
-        <label class="field"><span>Teléfono</span><input class="input" name="phone" maxlength="40" required></label>
-        <label class="field"><span>Ciudad</span><input class="input" name="municipality" maxlength="100" required></label>
-        <label class="field"><span>Contraseña (mínimo 12 caracteres)</span><input class="input" name="password" type="password" minlength="12" autocomplete="new-password" required></label>
-        <button class="button button-primary" type="submit">Crear empresa y cuenta</button>
-      </form>${links}</section>`;
-  } else if (view === 'forgot') {
-    content = `<section class="auth-card"><h1>Recuperar contraseña</h1><p>Enviaremos un enlace de recuperación al correo de tu cuenta.</p>${alert}
-      <form id="forgot-form" class="auth-form"><label class="field"><span>Correo</span><input class="input" name="email" type="email" autocomplete="email" required></label>
-      <button class="button button-primary" type="submit">Enviar enlace</button></form>${links}</section>`;
-  } else if (view === 'reset') {
-    content = `<section class="auth-card"><h1>Cambiar contraseña</h1><p>El enlace es válido por 30 minutos y solo puede usarse una vez.</p>${alert}
-      <form id="reset-form" class="auth-form"><input type="hidden" name="token" value="${escapeHtml(token)}">
-      <label class="field"><span>Nueva contraseña (mínimo 12 caracteres)</span><input class="input" name="password" type="password" minlength="12" autocomplete="new-password" required></label>
-      <button class="button button-primary" type="submit">Guardar contraseña</button></form>${links}</section>`;
-  } else if (view === 'login') {
-    content = `<section class="auth-card"><h1>Inicia sesión</h1><p>Accede al espacio financiero de tu empresa.</p>${alert}
-      <form id="login-form" class="auth-form"><label class="field"><span>Correo</span><input class="input" name="email" type="email" autocomplete="username" required></label>
-      <label class="field"><span>Contraseña</span><input class="input" name="password" type="password" autocomplete="current-password" required></label>
-      <label class="remember-option"><input name="remember" type="checkbox"><span>Recordarme en este dispositivo</span></label>
-      <button class="button button-primary" type="submit">Iniciar sesión</button></form>
-      <button type="button" class="page-link auth-forgot" data-auth-view="forgot">¿Olvidaste tu contraseña?</button>${links}</section>`;
-  } else {
-    content = `<section class="public-hero"><p class="eyebrow">GESTIÓN FINANCIERA EMPRESARIAL</p><h1>La información de tu empresa, clara y en un solo lugar.</h1>
-      <p>Administra ventas, clientes, gastos, nómina e inversiones; consulta reportes calculados desde tus datos.</p>
-      <div class="auth-links"><button type="button" class="button button-primary" data-auth-view="register">Registrar empresa</button><button type="button" class="button button-secondary" data-auth-view="login">Iniciar sesión</button></div></section>
-      <section class="public-features"><article><strong>Operación integrada</strong><p>Clientes, servicios, ventas, costos, gastos, nómina, impuestos y presupuestos.</p></article>
-        <article><strong>Reportes conectados</strong><p>Tablero, resultados, flujo de caja, punto de equilibrio, impuestos y proyección.</p></article>
-        <article><strong>Acceso por funciones</strong><p>Permisos para administración, contabilidad, asesoría y apoyo administrativo.</p></article></section>
-      <section class="public-plans"><h2>Planes</h2><p>La disponibilidad y las licencias se administran desde la consola del Super Administrador.</p></section>
-      <section class="public-faq"><h2>Preguntas frecuentes</h2><details><summary>¿Mis datos se mezclan con los de otras empresas?</summary><p>No. Cada empresa usa un espacio aislado en PostgreSQL y la API valida el acceso por empresa.</p></details>
-      <details><summary>¿Cómo se habilita la recuperación por correo?</summary><p>El envío se habilita al configurar el servidor SMTP de la instalación.</p></details></section>
-      <section class="public-contact"><h2>Contacto</h2><p>Solicita acceso a través del administrador del sistema.</p></section>`;
-  }
-  authScreen.innerHTML = `<div class="auth-brand">${logo}<div><strong>RENTA AL DÍA</strong><span>Gestión financiera para tu empresa</span></div></div>
-    <div class="auth-content">${content}</div><footer class="auth-footer">Renta al Día · Acceso protegido</footer>`;
-}
-
-async function handleAuthSubmit(event) {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement)) return;
-  event.preventDefault();
-  const payload = Object.fromEntries(new FormData(form));
-  const submit = form.querySelector('[type="submit"]');
-  submit.disabled = true;
-  try {
-    if (form.id === 'login-form') {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'No se pudo iniciar sesión.');
-      authState = data;
-      localStorage.setItem('rda-company-id', data.user.companyId);
-      await enterApplication();
-    } else if (form.id === 'register-form') {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'No se pudo registrar la empresa.');
-      localStorage.setItem('rda-company-id', data.user.companyId);
-      authState = await api('auth/session');
-      await enterApplication();
-    } else if (form.id === 'forgot-form') {
-      const result = await api('auth/password-reset-request', { method: 'POST', body: JSON.stringify(payload) });
-      renderAuthScreen('forgot', result.message);
-    } else if (form.id === 'reset-form') {
-      await api('auth/password-reset', { method: 'POST', body: JSON.stringify(payload) });
-      history.replaceState(null, '', authViewPaths.login);
-      renderAuthScreen('login', 'La contraseña se actualizó. Inicia sesión con la nueva contraseña.');
-    }
-  } catch (error) {
-    const view = form.id === 'register-form' ? 'register'
-      : form.id === 'forgot-form' ? 'forgot'
-        : form.id === 'reset-form' ? 'reset' : 'login';
-    renderAuthScreen(view, error.message);
-  }
-}
-
-async function enterApplication() {
-  document.getElementById('auth-screen').hidden = true;
-  document.querySelector('.app-shell').hidden = false;
   renderNavigation();
-  renderUserMenu();
-  setConnection(true, 'PostgreSQL conectado');
+  renderRoute();
   try {
     await loadSettings();
+    renderRoute();
   } catch (error) {
+    setConnection(false, 'Error de conexión con PostgreSQL');
     toast(error.message, true);
   }
-  await renderAuthenticatedRoute();
-}
-
-async function signOut() {
-  try {
-    await api('auth/logout', { method: 'POST' });
-  } catch (error) {
-    if (error.status !== 401) toast(error.message, true);
-  }
-  authState = null;
-  localStorage.removeItem('rda-company-id');
-  history.pushState(null, '', authViewPaths.login);
-  renderAuthScreen('login', 'La sesión se cerró.');
-}
-
-function openPasswordChange() {
-  const layer = document.getElementById('modal-layer');
-  layer.hidden = false;
-  layer.innerHTML = `<section class="modal" role="dialog" aria-modal="true" aria-labelledby="password-title">
-    <header class="modal-header"><div><h2 id="password-title">Cambiar contraseña</h2><p>La contraseña nueva debe tener al menos 12 caracteres.</p></div>
-      <button class="icon-button" type="button" data-action="close-modal" aria-label="Cerrar">${svg('close')}</button></header>
-    <form id="password-change-form"><div class="modal-body"><div class="modal-fields">
-      <label class="field"><span>Contraseña actual</span><input class="input" name="currentPassword" type="password" autocomplete="current-password" required></label>
-      <label class="field"><span>Nueva contraseña</span><input class="input" name="password" type="password" minlength="12" autocomplete="new-password" required></label>
-    </div></div><footer class="modal-footer"><button class="button button-secondary" type="button" data-action="close-modal">Cancelar</button>
-      <button class="button button-primary" type="submit">Actualizar contraseña</button></footer></form></section>`;
-  const modal = layer.querySelector('.modal');
-  modal.addEventListener('click', (event) => {
-    event.stopPropagation();
-    if (event.target.closest('[data-action="close-modal"]')) closeModal();
-  });
-  layer.querySelector('#password-change-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const button = event.currentTarget.querySelector('[type="submit"]');
-    button.disabled = true;
-    try {
-      const result = await api('auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))
-      });
-      authState.csrfToken = result.csrfToken;
-      closeModal();
-      toast('Contraseña actualizada.');
-    } catch (error) {
-      button.disabled = false;
-      showFormError(event.currentTarget, error.message);
-    }
-  });
 }
 
 start();

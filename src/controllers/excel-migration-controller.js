@@ -39,7 +39,7 @@ export async function importExcel(req, res) {
       req.params.token,
       req.body?.mappings,
       req.body?.replaceExisting === true,
-      req.auth.companyId
+      req.operator.companyId
     ));
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });

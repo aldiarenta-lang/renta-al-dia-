@@ -2,16 +2,16 @@
 
 ## Desarrollo
 
-La interfaz y la API se sirven desde una sola aplicación Express en `http://localhost:3000`. Inicia PostgreSQL y ejecuta:
+La ruta principal `/` abre directamente el Dashboard y todos los módulos se sirven desde una sola aplicación Express en `http://localhost:3000`, sin registro ni inicio de sesión. Inicia PostgreSQL y ejecuta:
 
 ```powershell
 npm.cmd run dev
 ```
 
-Las páginas usan rutas internas, por ejemplo `/`, `/login`, `/registro`, `/dashboard`, `/admin`, `/contador`, `/asesor` y `/cliente`. El servidor sirve la aplicación también al abrir o recargar directamente cualquiera de esas rutas. La API permanece en `/api` y utiliza la misma conexión PostgreSQL.
+El Dashboard está en `/` (la antigua ruta `/dashboard` sigue disponible por compatibilidad); los demás módulos se abren en rutas internas como `/clientes`, `/ventas`, `/impuestos` e `/importar-excel`. El servidor sirve la aplicación al abrir o recargar directamente cualquier ruta. La API permanece en `/api` y utiliza PostgreSQL con el contexto de la empresa operadora configurado al iniciar la aplicación.
 
 ## Producción y dominios
 
-La aplicación no depende del nombre del host. Puede publicarse en `www.rentaaldia.com` o detrás de un proxy TLS en `app.rentaaldia.com` o `admin.rentaaldia.com`, apuntando el proxy a la misma instancia de la aplicación. Configura `APP_BASE_URL` con la URL pública elegida para que los enlaces de recuperación de contraseña usen ese dominio. En Docker, la aplicación escucha en el puerto interno `3000`; `APP_PORT` configura el puerto externo publicado por Compose.
+La aplicación no depende del nombre del host. Al publicar el servicio Node en Render, `https://renta-al-dia.onrender.com/` abre directamente el Dashboard. También puede ejecutarse detrás de un proxy TLS, apuntando el host a la misma instancia. En Docker, la aplicación escucha en el puerto interno `3000`; `APP_PORT` configura el puerto externo publicado por Compose.
 
-El servidor web debe reenviar todas las rutas de la aplicación al mismo servicio y preservar `/api`. La configuración DNS, TLS y el proxy inverso pertenecen al despliegue y no requieren cambios en las rutas ni en PostgreSQL.
+El servidor web debe reenviar todas las rutas de la aplicación al mismo servicio y preservar `/api`. Como el panel no exige autenticación, limita el acceso al operador mediante la red privada, VPN o controles del proxy inverso antes de publicarlo en Internet. Estos controles no requieren cambios en las rutas ni en PostgreSQL.

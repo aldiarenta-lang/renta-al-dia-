@@ -2,13 +2,20 @@ import { Pool } from 'pg';
 import { tenantContext } from './tenant-context.js';
 
 const postgres = new Pool(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {});
+let operatorCompanyId = null;
 
 export const pool = {
+  setOperatorCompanyId(companyId) {
+    operatorCompanyId = companyId;
+  },
+  getOperatorCompanyId() {
+    return operatorCompanyId;
+  },
   connect: () => postgres.connect(),
   end: () => postgres.end(),
   privilegedQuery: (statement, values) => postgres.query(statement, values),
   async query(statement, values) {
-    const { companyId } = tenantContext.getStore() || {};
+    const { companyId = operatorCompanyId } = tenantContext.getStore() || {};
     if (!companyId) return postgres.query(statement, values);
 
     const client = await postgres.connect();

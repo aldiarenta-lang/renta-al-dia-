@@ -4,7 +4,6 @@ import { pool } from './db/pool.js';
 import { app } from './app.js';
 import { seedDatabase } from './db/seed-db.js';
 import { applyMigrations, applyTenantViews, prepareSchema } from './db/migrations.js';
-import { bootstrapSuperAdmin } from './services/auth-service.js';
 
 const port = process.env.NODE_ENV === 'production' ? Number(process.env.PORT || 3000) : 3000;
 
@@ -21,11 +20,11 @@ async function start() {
     : 'Los datos de demostración ya estaban cargados; no se agregaron duplicados.');
   await applyMigrations(pool);
   await applyTenantViews(pool);
-  const superAdminCreated = await bootstrapSuperAdmin(pool);
-  if (superAdminCreated) console.log('Super Administrador inicial creado desde las variables de entorno.');
-  if (!process.env.SUPER_ADMIN_EMAIL || !process.env.SUPER_ADMIN_PASSWORD) {
-    console.warn('SUPER_ADMIN_EMAIL y SUPER_ADMIN_PASSWORD no están configurados; no se aprovisionó ningún acceso inicial.');
-  }
+  const company = await pool.privilegedQuery(
+    'SELECT company_id FROM company_settings ORDER BY company_id LIMIT 1'
+  );
+  if (!company.rowCount) throw new Error('Configura una empresa operadora en PostgreSQL antes de iniciar el sistema.');
+  pool.setOperatorCompanyId(company.rows[0].company_id);
   await pool.query('SELECT 1');
   app.listen(port, () => console.log(`Renta al Día disponible en http://localhost:${port}`));
 }

@@ -3,7 +3,7 @@ import { breakEvenReport, reportData } from '../services/report-service.js';
 
 export async function getReport(req, res) {
   try {
-    const data = await reportData(req.auth.companyId);
+    const data = await reportData(req.operator.companyId);
     if (!data.configured) return res.json({ configured: false });
     if (req.params.name === 'dashboard' || req.params.name === 'summary') {
       const actualRevenue = data.revenue.slice(0, 3).reduce((sum, value) => sum + value, 0);

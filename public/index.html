@@ -4,20 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#102945">
-    <meta name="description" content="Gestión financiera y administrativa de Renta al Día">
-    <title>Renta al Día | Gestión financiera</title>
+    <meta name="description" content="Dashboard de Renta al Día. Administra información y consulta reportes desde un solo lugar.">
+    <title>Renta al Día | Dashboard</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
   </head>
   <body>
-    <main class="auth-shell" id="auth-screen" hidden></main>
-    <div class="app-shell">
+    <div class="app-shell" id="operator-app">
       <aside class="sidebar" id="sidebar">
-        <a class="brand" href="/dashboard" aria-label="Renta al Día, ir al tablero">
+        <a class="brand" href="/" aria-label="Renta al Día, Dashboard">
           <img src="/assets/logo.jpeg" alt="Logotipo de Renta al Día">
           <span class="brand-copy">
             <strong>RENTA <span>AL DÍA</span></strong>
-            <small>Gestión financiera</small>
+            <small>Declaraciones de renta</small>
           </span>
         </a>
         <div class="nav-caption">ESPACIO DE TRABAJO</div>
@@ -35,20 +34,10 @@
           </button>
           <div class="breadcrumb"><span>Renta al Día</span><span class="breadcrumb-separator">/</span><strong id="breadcrumb-title">Tablero</strong></div>
           <div class="topbar-actions">
-            <label class="company-switcher" id="company-switcher-wrap" hidden>
-              <span class="visually-hidden">Empresa activa</span>
-              <select class="select" id="company-switcher" aria-label="Empresa activa"></select>
-            </label>
             <span class="year-chip" id="year-chip">Año sin configurar</span>
             <a class="settings-shortcut" href="/configuracion" aria-label="Configurar empresa">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 1 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3h-.2a1.8 1.8 0 1 1 0-3.6h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 1 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 1 1 0 3.6h-.2a1.8 1.8 0 0 0-.9 3Z"/></svg>
             </a>
-            <div class="user-menu" id="user-menu" hidden>
-              <span class="user-avatar" id="user-avatar" aria-hidden="true"></span>
-              <span class="user-identity"><strong id="user-name"></strong><small id="user-role"></small></span>
-              <button class="button button-secondary" type="button" data-action="change-password">Contraseña</button>
-              <button class="button button-secondary" type="button" data-action="logout">Cerrar sesión</button>
-            </div>
           </div>
         </header>
         <main id="main-content" tabindex="-1" aria-live="polite"></main>

@@ -18,10 +18,9 @@ after(async () => {
   if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 });
 
-test('sirve la aplicación en las rutas públicas, módulos y portales internos', async () => {
+test('sirve el Dashboard en la ruta raíz y conserva las rutas de módulos', async () => {
   const routes = [
-    '/', '/login', '/registro', '/recuperar', '/restablecer',
-    '/dashboard', '/admin', '/contador', '/asesor', '/cliente', '/auxiliar',
+    '/', '/dashboard',
     '/ventas', '/estado-resultados', '/flujo-caja', '/punto-equilibrio'
   ];
 
@@ -29,14 +28,34 @@ test('sirve la aplicación en las rutas públicas, módulos y portales internos'
     const response = await fetch(new URL(route, baseUrl));
     assert.equal(response.status, 200, `${route} debe servir la aplicación`);
     assert.match(response.headers.get('content-type') || '', /text\/html/);
-    assert.match(await response.text(), /Renta al Día/);
+    const html = await response.text();
+    assert.match(html, /Renta al Día/);
+    assert.match(html, /id="operator-app"/);
+    assert.doesNotMatch(html, /landing-page|landing-shell|Ingresar al sistema/);
   }
 });
 
-test('mantiene /api separado de las rutas web y protegido por autenticación', async () => {
-  const response = await fetch(new URL('/api/ruta-inexistente', baseUrl));
+test('la raíz y la ruta anterior del Dashboard cargan el mismo punto de entrada', async () => {
+  const [rootResponse, dashboardResponse, scriptResponse] = await Promise.all([
+    fetch(new URL('/', baseUrl)),
+    fetch(new URL('/dashboard', baseUrl)),
+    fetch(new URL('/app.js', baseUrl))
+  ]);
+  const rootHtml = await rootResponse.text();
+  const dashboardHtml = await dashboardResponse.text();
+  const script = await scriptResponse.text();
 
-  assert.equal(response.status, 401);
+  assert.equal(rootResponse.status, 200);
+  assert.equal(dashboardResponse.status, 200);
+  assert.equal(rootHtml, dashboardHtml);
+  assert.match(script, /dashboard:\s*'\/'/);
+  assert.match(script, /pathModules\.set\('\/dashboard',\s*'dashboard'\)/);
+});
+
+test('la API no requiere sesión y reporta cuando falta configurar el contexto del operador', async () => {
+  const response = await fetch(new URL('/api/unknown', baseUrl));
+
+  assert.equal(response.status, 503);
   assert.match(response.headers.get('content-type') || '', /application\/json/);
-  assert.equal(typeof (await response.json()).error, 'string');
+  assert.deepEqual(await response.json(), { error: 'La empresa operadora aún no está configurada.' });
 });

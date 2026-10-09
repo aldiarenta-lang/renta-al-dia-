@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { seedDatabase } from './db/seed-db.js';
 import { applyMigrations, applyTenantViews, prepareSchema } from './db/migrations.js';
-import { bootstrapSuperAdmin } from './services/auth-service.js';
 
 if (!process.env.DATABASE_URL && !process.env.PGDATABASE) {
   throw new Error('Configura DATABASE_URL o las variables PG* antes de inicializar PostgreSQL.');
@@ -22,9 +21,7 @@ try {
     : 'Los datos de demostración ya estaban cargados; no se agregaron duplicados.');
   await applyMigrations(pool);
   await applyTenantViews(pool);
-  const superAdminCreated = await bootstrapSuperAdmin(pool);
-  console.log('Esquema multiempresa aplicado y aislamiento PostgreSQL habilitado.');
-  if (superAdminCreated) console.log('Super Administrador inicial creado desde las variables de entorno.');
+  console.log('Esquema PostgreSQL inicializado para operación local.');
 } catch (error) {
   console.error('No se pudo inicializar el esquema de PostgreSQL:', error);
   process.exitCode = 1;

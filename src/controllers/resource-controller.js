@@ -29,7 +29,7 @@ export function createResourceController(definition) {
           `INSERT INTO ${definition.table} (company_id, ${fields.join(', ')})
            VALUES ($${fields.length + 1}, ${fields.map((_, index) => `$${index + 1}`).join(', ')})
            RETURNING ${definition.key}`,
-          [...fields.map((field) => values[field]), req.auth.companyId]
+          [...fields.map((field) => values[field]), req.operator.companyId]
         );
         const created = await pool.query(
           `SELECT * FROM ${definition.view} WHERE ${definition.key} = $1`,

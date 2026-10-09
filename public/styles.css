@@ -152,12 +152,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .settings-shortcut svg, .icon-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 .menu-toggle { display: none; }
-.company-switcher .select { min-width: 150px; max-width: 220px; min-height: 34px; padding: 0 28px 0 9px; }
-.user-menu { display: flex; align-items: center; gap: 9px; }
-.user-avatar { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--navy); background: var(--gold-pale); font-size: 11px; font-weight: 700; }
-.user-identity { display: grid; max-width: 175px; gap: 2px; }
-.user-identity strong { overflow: hidden; color: var(--navy); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.user-identity small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 #main-content { width: min(1400px, 100%); min-height: calc(100vh - 105px); margin: 0 auto; padding: 30px 34px 40px; }
 .app-footer { padding: 0 34px 20px; color: #98a1ae; font-size: 10px; }
 .app-footer span { padding: 0 4px; color: var(--gold); }
@@ -313,35 +307,6 @@ h1 { margin-bottom: 7px; color: var(--navy); font: 750 25px "Segoe UI", Arial, s
 .toast { padding: 12px 15px; border: 1px solid #d9e7e1; border-radius: 8px; color: #286b54; background: #f2faf6; box-shadow: var(--shadow); font-size: 11px; line-height: 1.5; animation: toast-in .18s ease; }
 .toast.error { border-color: #efd7d7; color: #963f3f; background: #fff5f5; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-.auth-shell[hidden] { display: none; }
-.auth-shell { min-height: 100vh; padding: 28px max(24px, calc((100vw - 1040px) / 2)); background: linear-gradient(145deg, #f4f6f9, #fff 55%, #fbf3dc); }
-.auth-brand { display: flex; align-items: center; gap: 13px; color: var(--navy); }
-.auth-brand img { width: 54px; height: 54px; border-radius: 10px; object-fit: cover; }
-.auth-brand div { display: grid; gap: 4px; }
-.auth-brand strong { font-size: 14px; letter-spacing: .1em; }
-.auth-brand span { color: var(--muted); font-size: 11px; }
-.auth-content { display: grid; min-height: calc(100vh - 145px); place-items: center; padding: 34px 0; }
-.auth-card { width: min(470px, 100%); padding: 30px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 18px 50px rgb(16 41 69 / 9%); }
-.auth-card h1, .public-hero h1 { margin-bottom: 8px; color: var(--navy); font: 750 26px "Segoe UI", Arial, sans-serif; letter-spacing: -.03em; }
-.auth-card > p, .public-hero > p:not(.eyebrow) { margin-bottom: 20px; color: var(--muted); font-size: 12px; line-height: 1.65; }
-.auth-form { display: grid; gap: 14px; }
-.auth-form .button { width: 100%; margin-top: 4px; }
-.remember-option { display: flex; align-items: center; gap: 8px; color: #536176; font-size: 11px; }
-.remember-option input { width: 16px; height: 16px; accent-color: var(--navy); }
-.auth-links { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 18px; }
-.auth-links button, .auth-forgot { padding: 0; border: 0; background: none; font-size: 11px; cursor: pointer; }
-.auth-forgot { display: block; margin: 16px auto 0; }
-.auth-footer { padding: 14px 0; color: #8c96a4; font-size: 10px; text-align: center; }
-.public-hero { width: min(760px, 100%); padding: 48px; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 0 18px 50px rgb(16 41 69 / 8%); }
-.public-hero .eyebrow { margin-bottom: 11px; }
-.public-hero h1 { max-width: 640px; font-size: 34px; line-height: 1.2; }
-.public-hero .auth-links { margin-top: 24px; }
-.public-features { display: grid; width: min(920px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0 auto 24px; }
-.public-features article, .public-plans, .public-faq, .public-contact { padding: 20px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
-.public-features strong, .public-plans h2, .public-faq h2, .public-contact h2 { color: var(--navy); font-size: 13px; }
-.public-features p, .public-plans p, .public-faq p, .public-contact p { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.public-plans, .public-faq, .public-contact { width: min(920px, 100%); margin: 0 auto 14px; }
-.public-faq details { margin-top: 12px; color: #536176; font-size: 11px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .modal-layer[hidden] { display: none; }
 .modal-layer { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; overflow: auto; padding: 20px; background: rgb(13 28 44 / 53%); backdrop-filter: blur(3px); }
@@ -400,15 +365,6 @@ h1 { margin-bottom: 7px; color: var(--navy); font: 750 25px "Segoe UI", Arial, s
   .breadcrumb-separator { display: none; }
   .year-chip { max-width: 128px; overflow: hidden; padding: 5px 8px; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
   .topbar-actions { gap: 8px; }
-  .company-switcher .select { width: 120px; min-width: 0; }
-  .user-identity { display: none; }
-  .user-menu .button { min-height: 32px; padding: 0 8px; font-size: 10px; }
-  .auth-shell { padding: 18px 15px; }
-  .auth-card { padding: 22px 18px; }
-  .auth-content { min-height: calc(100vh - 120px); padding: 22px 0; }
-  .public-hero { padding: 28px 20px; }
-  .public-hero h1 { font-size: 27px; }
-  .public-features { grid-template-columns: 1fr; }
   .settings-shortcut, .icon-button { width: 32px; height: 32px; }
   .page-heading { flex-direction: column; gap: 13px; }
   h1 { font-size: 22px; }

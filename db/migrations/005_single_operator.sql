@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS user_sessions CASCADE;
+DROP TABLE IF EXISTS password_reset_tokens CASCADE;
+DROP TABLE IF EXISTS company_memberships CASCADE;
+DROP TABLE IF EXISTS role_permissions CASCADE;
+DROP TABLE IF EXISTS company_licenses CASCADE;
+DROP TABLE IF EXISTS subscription_plans CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS permissions CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+
+INSERT INTO schema_migrations (name) VALUES ('005_single_operator')
+ON CONFLICT (name) DO NOTHING;
