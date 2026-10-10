@@ -65,6 +65,9 @@ test('la proyección financiera conserva seis meses reales y cubre hasta el Año
   assert.match(script, /Julio del Año 1 a diciembre del Año 4/);
   assert.match(script, /42 meses de proyección desde julio/);
   assert.match(script, /chart-label|chart-value/);
+  assert.match(script, /Cálculo:/);
+  assert.match(script, /Ver \$\{details\.inputs\.length\} valores usados/);
+  assert.match(script, /Cálculo \/ valores considerados/);
   assert.match(rootHtml, /id="operator-app"/);
 });
 

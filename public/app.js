@@ -418,8 +418,27 @@ function renderInicio(module) {
     </div>`;
 }
 
-function metricCard(label, value, note, iconName) {
-  return `<article class="card metric-card"><div class="metric-top"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-mark">${svg(iconName)}</div></div><div class="metric-value">${value}</div><div class="metric-note">${escapeHtml(note)}</div></article>`;
+function calculationDetails(details) {
+  if (!details) return '';
+  const missing = details.missing?.length
+    ? `<p class="calculation-missing"><strong>Revisar:</strong> ${details.missing.map(escapeHtml).join(' ')}</p>`
+    : '';
+  const inputs = details.inputs?.length
+    ? `<details class="calculation-inputs"><summary>Ver ${details.inputs.length} valores usados</summary><ul>${details.inputs.map((item) => {
+      const value = item.value === null || item.value === undefined
+        ? '—'
+        : item.format === 'money' ? formatMoney(item.value)
+          : item.format === 'percent' ? formatPercent(item.value)
+            : item.format === 'months' ? `${formatNumber(item.value)} meses`
+              : formatNumber(item.value);
+      return `<li><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(value)}</strong></li>`;
+    }).join('')}</ul></details>`
+    : '';
+  return `<div class="calculation-explainer"><p><strong>Cálculo:</strong> ${escapeHtml(details.formula)}</p>${missing}${inputs}</div>`;
+}
+
+function metricCard(label, value, note, iconName, details) {
+  return `<article class="card metric-card"><div class="metric-top"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-mark">${svg(iconName)}</div></div><div class="metric-value">${value}</div><div class="metric-note">${escapeHtml(note)}</div>${calculationDetails(details)}</article>`;
 }
 
 function chartSvg(labels, values, { accent = false, valuePrefix = '$' } = {}) {
@@ -456,10 +475,10 @@ function chartSvg(labels, values, { accent = false, valuePrefix = '$' } = {}) {
   return `<svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico de ingresos mensuales. Escala máxima ${escapeHtml(label)}">${guides}${bars}<text class="chart-value" x="${plotLeft}" y="11">${escapeHtml(label)}</text></svg>`;
 }
 
-function chartCard(title, subtitle, labels, values, accent = false) {
+function chartCard(title, subtitle, labels, values, accent = false, calculation) {
   return `<section class="card chart-card"><div class="card-heading"><div><h2>${escapeHtml(title)}</h2><p class="card-subtitle">${escapeHtml(subtitle)}</p></div></div>
     <div class="card-body">${chartSvg(labels, values, { accent })}
-    <div class="chart-legend"><span><i class="legend-dot${accent ? ' gold' : ''}"></i>${escapeHtml(title)}</span></div></div></section>`;
+    <div class="chart-legend"><span><i class="legend-dot${accent ? ' gold' : ''}"></i>${escapeHtml(title)}</span></div>${calculationDetails(calculation)}</div></section>`;
 }
 
 function renderDashboard(module, report) {
@@ -467,34 +486,51 @@ function renderDashboard(module, report) {
   if (!report.configured) {
     return `${pageHeading(module, actions)}${configurationBanner()}${setupBlock()}`;
   }
+  const calculations = report.calculationDetails || {};
+  const monthlyInputs = (values, formula, missing = []) => ({
+    formula,
+    inputs: report.months.map((month, index) => ({
+      label: month, value: values[index], format: 'money'
+    })),
+    missing
+  });
   const metrics = [
-    metricCard('Ingresos netos reales', formatMoney(report.actualRevenue), 'Ventas completadas · enero a junio', 'receipt'),
-    metricCard('Utilidad operacional real', formatMoney(report.actualProfit), `Histórico enero–junio · ${report.year}`, 'chart'),
-    metricCard('Servicios completados', formatNumber(report.completedServices), 'Cantidad histórica · enero a junio', 'people'),
-    metricCard('Caja proyectada a 42 meses', formatMoney(report.endingCash), `Reserva mínima: ${formatMoney(report.minimumCashReserve)}`, 'cash')
+    metricCard('Ingresos netos reales', formatMoney(report.actualRevenue), 'Ventas completadas · enero a junio', 'receipt', calculations.actualRevenue),
+    metricCard('Utilidad operacional real', formatMoney(report.actualProfit), `Histórico enero–junio · ${report.year}`, 'chart', calculations.actualProfit),
+    metricCard('Servicios completados', formatNumber(report.completedServices), 'Cantidad histórica · enero a junio', 'people', calculations.completedServices),
+    metricCard('Caja proyectada a 42 meses', formatMoney(report.endingCash), `Reserva mínima: ${formatMoney(report.minimumCashReserve)}`, 'cash', calculations.projectedCash)
   ].join('');
   const indicators = report.strategicIndicators || {};
   const strategicCards = [
-    reportCard('VPN / VAN', formatMoney(indicators.npv), 'Proyección descontada con la tasa configurada'),
-    reportCard('TIR', formatPercent(indicators.irr), 'Rentabilidad anual implícita'),
-    reportCard('PRI / Payback', indicators.paybackMonths === null ? '—' : `${formatNumber(indicators.paybackMonths)} meses`, indicators.paybackYears === null ? 'No recupera en el horizonte' : `${formatNumber(indicators.paybackYears)} años`),
-    reportCard('EBITDA histórico', formatMoney(indicators.ebitda), 'Enero a junio'),
-    reportCard('ROI histórico', formatPercent(indicators.roi), 'Utilidad neta / inversión registrada'),
-    reportCard('ROA proyectado', formatPercent(indicators.roa), 'Utilidad neta / activos totales'),
-    reportCard('ROE proyectado', formatPercent(indicators.roe), 'Utilidad neta / patrimonio'),
-    reportCard('Margen bruto histórico', formatPercent(indicators.grossMargin), 'Utilidad bruta / ventas'),
-    reportCard('Margen operacional histórico', formatPercent(indicators.operatingMargin), 'Utilidad operacional / ventas'),
-    reportCard('Margen neto histórico', formatPercent(indicators.netMargin), 'Utilidad neta / ventas'),
-    reportCard('Liquidez proyectada', formatNumber(indicators.currentRatio), 'Activo corriente / pasivo corriente'),
-    reportCard('Prueba ácida', formatNumber(indicators.quickRatio), 'Activos corrientes menos inventario / pasivo corriente'),
-    reportCard('Endeudamiento', formatPercent(indicators.debtRatio), 'Pasivos / activos'),
-    reportCard('Capital de trabajo', formatMoney(indicators.workingCapital), 'Saldo al cierre del Año 4')
+    reportCard('VPN / VAN', formatMoney(indicators.npv), 'Proyección descontada con la tasa configurada', calculations.npv),
+    reportCard('TIR', formatPercent(indicators.irr), 'Rentabilidad anual implícita', calculations.irr),
+    reportCard('PRI / Payback', indicators.paybackMonths === null ? '—' : `${formatNumber(indicators.paybackMonths)} meses`, indicators.paybackYears === null ? 'No recupera en el horizonte' : `${formatNumber(indicators.paybackYears)} años`, calculations.payback),
+    reportCard('EBITDA histórico', formatMoney(indicators.ebitda), 'Enero a junio', calculations.ebitda),
+    reportCard('ROI proyectado (42 meses)', formatPercent(indicators.roi), 'Utilidad neta proyectada / inversión registrada', calculations.roi),
+    reportCard('ROA proyectado', formatPercent(indicators.roa), 'Utilidad neta / activos totales', calculations.roa),
+    reportCard('ROE proyectado', formatPercent(indicators.roe), 'Utilidad neta / patrimonio', calculations.roe),
+    reportCard('Margen bruto histórico', formatPercent(indicators.grossMargin), 'Utilidad bruta / ventas', calculations.grossMargin),
+    reportCard('Margen operacional histórico', formatPercent(indicators.operatingMargin), 'Utilidad operacional / ventas', calculations.operatingMargin),
+    reportCard('Margen neto histórico', formatPercent(indicators.netMargin), 'Utilidad neta / ventas', calculations.netMargin),
+    reportCard('Liquidez proyectada', formatNumber(indicators.currentRatio), 'Activo corriente / pasivo corriente', calculations.currentRatio),
+    reportCard('Prueba ácida', formatNumber(indicators.quickRatio), 'Activos corrientes menos inventario / pasivo corriente', calculations.quickRatio),
+    reportCard('Endeudamiento', formatPercent(indicators.debtRatio), 'Pasivos / activos', calculations.debtRatio),
+    reportCard('Capital de trabajo', formatMoney(indicators.workingCapital), 'Saldo al cierre del Año 4', calculations.workingCapital)
   ].join('');
-  const yearRows = (report.years || []).map((year) => [
-    String(year.year), formatMoney(year.revenue), formatMoney(year.netProfit),
-    formatPercent(year.netMargin), formatMoney(year.endingCash),
-    formatPercent(year.comparison?.revenueGrowth)
-  ]);
+  const yearRows = (report.years || []).map((year) => {
+    const detail = [
+      `Ventas ${formatMoney(year.revenue)} = ingresos históricos/proyectados del período`,
+      `Utilidad neta ${formatMoney(year.netProfit)} = resultado después de impuestos`,
+      `Margen ${formatPercent(year.netMargin)} = utilidad neta ÷ ventas`,
+      `Caja ${formatMoney(year.cashStart)} + flujo neto ${formatMoney(year.netCashFlow)} = caja final ${formatMoney(year.endingCash)}`,
+      `Ventas ${formatMoney(year.revenue)} ÷ base ${formatMoney(year.comparison?.revenueBase)} − 1 = crecimiento ${formatPercent(year.comparison?.revenueGrowth)}`
+    ].join(' · ');
+    return [
+      String(year.year), formatMoney(year.revenue), formatMoney(year.netProfit),
+      formatPercent(year.netMargin), formatMoney(year.endingCash),
+      formatPercent(year.comparison?.revenueGrowth), escapeHtml(detail)
+    ];
+  });
   const cashWarning = Number(report.endingCash) < Number(report.minimumCashReserve)
     ? configurationBanner(`El saldo final de caja estimado (${formatMoney(report.endingCash)}) está por debajo de la reserva mínima configurada (${formatMoney(report.minimumCashReserve)}).`)
     : '';
@@ -505,8 +541,11 @@ function renderDashboard(module, report) {
     <div class="metric-grid">${metrics}</div>
     <section class="card"><div class="card-heading"><div><h2>Indicadores Estratégicos</h2><p class="card-subtitle">Valores históricos al primer semestre y saldos proyectados a 42 meses</p></div></div><div class="report-cards">${strategicCards}</div></section>
     <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Comparativo por año proyectado</h2><p class="card-subtitle">Año 1 corresponde a julio–diciembre; los años siguientes son períodos completos.</p></div></div>
-      ${renderReportTable(['Año', 'Ventas', 'Utilidad neta', 'Margen neto', 'Caja final', 'Crecimiento ventas'], yearRows)}</section>
-    <div class="dashboard-grid">${chartCard('Ingresos netos por mes', `Ventas completadas · ${report.year}`, report.months, report.quarterlyRevenue)}
+      ${renderReportTable(['Año', 'Ventas', 'Utilidad neta', 'Margen neto', 'Caja final', 'Crecimiento ventas', 'Cálculo / valores considerados'], yearRows, { className: 'dashboard-comparison-table' })}</section>
+    <div class="dashboard-grid">${chartCard('Ingresos netos por mes', `Ventas completadas · ${report.year}`, report.months, report.quarterlyRevenue, false, monthlyInputs(
+      report.quarterlyRevenue,
+      'Cada valor corresponde a la suma de ingresos netos de ventas completadas registradas en PostgreSQL para el mes.'
+    ))}
       <section class="card"><div class="card-heading"><div><h2>Plan de trabajo</h2><p class="card-subtitle">Accesos directos a la operación</p></div></div>
       <div class="card-body"><div class="activity-list">
         <div class="activity-item"><div class="activity-icon">${svg('tag')}</div><div><p class="activity-title">Servicios e ingresos</p><p class="activity-text">Actualiza precios, ventas y costos asociados a cada servicio.</p></div></div>
@@ -515,13 +554,16 @@ function renderDashboard(module, report) {
         <div class="activity-item"><div class="activity-icon">${svg('file')}</div><div><p class="activity-title">Informes financieros</p><p class="activity-text">Explora resultados, impuestos y flujo de caja.</p></div></div>
       </div></div></section>
     </div>
-    <div class="dashboard-lower">${chartCard('Utilidad operacional', `Estimación mensual · ${report.year}`, report.months, report.quarterlyProfit, true)}
+    <div class="dashboard-lower">${chartCard('Utilidad operacional', `Estimación mensual · ${report.year}`, report.months, report.quarterlyProfit, true, monthlyInputs(
+      report.quarterlyProfit,
+      'Ventas netas − costos directos − gastos comerciales y administrativos − nómina empleador − depreciación.'
+    ))}
       <section class="card"><div class="card-heading"><div><h2>Resumen del ejercicio</h2><p class="card-subtitle">Información real de enero a junio y proyección desde julio</p></div></div>
       <div class="card-body"><div class="activity-list">
-        <div class="activity-item"><div class="activity-icon">${svg('chart')}</div><div><p class="activity-title">Ingresos históricos y proyectados</p><p class="activity-text">${formatMoney(report.projectedRevenue)} · seis meses reales y 42 meses proyectados</p></div></div>
-        <div class="activity-item"><div class="activity-icon">${svg('coins')}</div><div><p class="activity-title">Inversión inicial registrada</p><p class="activity-text">${formatMoney(report.totalInvestments)}</p></div></div>
-        <div class="activity-item"><div class="activity-icon">${svg('briefcase')}</div><div><p class="activity-title">Financiación y aportes registrados</p><p class="activity-text">${formatMoney(report.totalFinancing)}</p></div></div>
-        <div class="activity-item"><div class="activity-icon">${svg('cost')}</div><div><p class="activity-title">Costo hora profesional calculado</p><p class="activity-text">${formatMoney(report.costPerHour)} · escenario ${escapeHtml(report.scenario)}</p></div></div>
+        <div class="activity-item"><div class="activity-icon">${svg('chart')}</div><div><p class="activity-title">Ingresos históricos y proyectados</p><p class="activity-text">${formatMoney(report.projectedRevenue)} · seis meses reales y 42 meses proyectados</p>${calculationDetails(calculations.projectedRevenue)}</div></div>
+        <div class="activity-item"><div class="activity-icon">${svg('coins')}</div><div><p class="activity-title">Inversión inicial registrada</p><p class="activity-text">${formatMoney(report.totalInvestments)}</p>${calculationDetails(calculations.totalInvestments)}</div></div>
+        <div class="activity-item"><div class="activity-icon">${svg('briefcase')}</div><div><p class="activity-title">Financiación y aportes registrados</p><p class="activity-text">${formatMoney(report.totalFinancing)}</p>${calculationDetails(calculations.totalFinancing)}</div></div>
+        <div class="activity-item"><div class="activity-icon">${svg('cost')}</div><div><p class="activity-title">Costo hora profesional calculado</p><p class="activity-text">${formatMoney(report.costPerHour)} · escenario ${escapeHtml(report.scenario)}</p>${calculationDetails(calculations.costPerHour)}</div></div>
       </div></div></section>
     </div>`;
 }
@@ -628,15 +670,15 @@ function buildEntityPage(module, resource, rows, search = '') {
     </section>`;
 }
 
-function renderReportTable(headers, rows, { totalRows = [] } = {}) {
+function renderReportTable(headers, rows, { totalRows = [], className = '' } = {}) {
   const head = `<tr>${headers.map((header) => `<th scope="col">${escapeHtml(header)}</th>`).join('')}</tr>`;
   const body = rows.map((row) => `<tr>${row.map((value) => `<td>${value}</td>`).join('')}</tr>`).join('');
   const totals = totalRows.length ? totalRows.map((row) => `<tr class="report-total">${row.map((value) => `<td>${value}</td>`).join('')}</tr>`).join('') : '';
-  return `<div class="table-wrap"><table class="data-table report-table"><thead>${head}</thead><tbody>${body}${totals}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="data-table report-table${className ? ` ${escapeHtml(className)}` : ''}"><thead>${head}</thead><tbody>${body}${totals}</tbody></table></div>`;
 }
 
-function reportCard(label, value, detail) {
-  return `<article class="card report-card"><div class="report-card-label">${escapeHtml(label)}</div><div class="report-card-value">${value}</div><div class="report-card-detail">${escapeHtml(detail)}</div></article>`;
+function reportCard(label, value, detail, calculation) {
+  return `<article class="card report-card"><div class="report-card-label">${escapeHtml(label)}</div><div class="report-card-value">${value}</div><div class="report-card-detail">${escapeHtml(detail)}</div>${calculationDetails(calculation)}</article>`;
 }
 
 function reportEmpty(module) {

@@ -203,6 +203,17 @@ h1 { margin-bottom: 7px; color: var(--navy); font: 750 25px "Segoe UI", Arial, s
 .metric-label { margin-bottom: 14px; color: #68778b; font-size: 11px; font-weight: 600; }
 .metric-value { margin-bottom: 5px; color: var(--navy); font: 750 23px "Segoe UI", Arial, sans-serif; letter-spacing: -.04em; }
 .metric-note { color: #9099a6; font-size: 10px; }
+.calculation-explainer { margin-top: 9px; color: #66758a; font-size: 10px; line-height: 1.5; }
+.calculation-explainer > p { margin: 5px 0; }
+.calculation-missing { padding: 6px 8px; border-left: 2px solid #d49b29; color: #805b12; background: #fff9e9; }
+.calculation-inputs { margin-top: 5px; }
+.calculation-inputs summary { color: #315b80; font-size: 10px; font-weight: 650; cursor: pointer; }
+.calculation-inputs ul { display: grid; gap: 4px; margin: 7px 0 0; padding: 0; list-style: none; }
+.calculation-inputs li { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 3px; border-bottom: 1px solid #eef1f4; }
+.calculation-inputs li strong { color: #34445a; text-align: right; }
+.report-table td { vertical-align: top; }
+.dashboard-comparison-table td:last-child { min-width: 260px; color: #66758a; font-size: 10px; line-height: 1.5; }
+.activity-item .calculation-explainer { max-width: 520px; }
 .metric-mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; color: #87651e; background: var(--gold-pale); }
 .metric-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .metric-mark svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
