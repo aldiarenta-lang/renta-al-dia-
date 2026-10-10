@@ -6,7 +6,8 @@ import {
   calculateEmployerPayroll,
   calculateIrr,
   calculateNetPresentValue,
-  calculatePaybackMonths
+  calculatePaybackMonths,
+  transactionDateParts
 } from '../src/services/report-service.js';
 
 test('construye los 42 meses desde julio del Año 1 hasta diciembre del Año 4', () => {
@@ -31,6 +32,12 @@ test('construye los 42 meses desde julio del Año 1 hasta diciembre del Año 4',
     [2026, 2027, 2028, 2029].map((year) => schedule.filter((row) => row.year === year).length),
     [6, 12, 12, 12]
   );
+});
+
+test('lee las fechas de inversión devueltas por PostgreSQL como Date o ISO', () => {
+  assert.deepEqual(transactionDateParts(new Date('2026-01-08T05:00:00.000Z')), { year: 2026, month: 0 });
+  assert.deepEqual(transactionDateParts('2026-01-08T00:00:00.000Z'), { year: 2026, month: 0 });
+  assert.throws(() => transactionDateParts('no-es-fecha'), /fecha de la transacción de inversión no es válida/);
 });
 
 test('calcula el costo patronal con las tasas de nómina configuradas', () => {

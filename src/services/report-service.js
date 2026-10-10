@@ -73,6 +73,22 @@ function sum(rows, key) {
   return rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 }
 
+export function transactionDateParts(value) {
+  const isoDate = value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value).slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) throw new TypeError('La fecha de la transacción de inversión no es válida.');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (month < 1 || month > 12 || parsed.getUTCDate() !== day || parsed.getUTCMonth() !== month - 1) {
+    throw new TypeError('La fecha de la transacción de inversión no es válida.');
+  }
+  return { year, month: month - 1 };
+}
+
 export function calculateIrr(cashFlows) {
   if (!cashFlows.some((value) => value < 0) || !cashFlows.some((value) => value > 0)) return null;
   const npv = (rate) => cashFlows.reduce((value, cashFlow, index) => value + cashFlow / Math.pow(1 + rate, index), 0);
@@ -356,9 +372,7 @@ export async function reportData(companyId) {
   const monthlyDepreciation = Array(48).fill(0);
   const monthlyFinanceExpense = Array(48).fill(0);
   for (const row of investments.rows) {
-    const transactionDate = String(row.transaction_date).slice(0, 10);
-    const transactionYear = Number(transactionDate.slice(0, 4));
-    const startMonth = Number(transactionDate.slice(5, 7)) - 1;
+    const { year: transactionYear, month: startMonth } = transactionDateParts(row.transaction_date);
     const startPeriod = (transactionYear - Number(config.fiscal_year)) * 12 + startMonth;
     const amount = Number(row.amount);
     const usefulLifeMonths = Math.ceil(Number(row.useful_life_years || 0) * 12);
