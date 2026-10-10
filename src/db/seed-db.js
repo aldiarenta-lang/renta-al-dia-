@@ -73,7 +73,7 @@ export async function ensureOperatorCompany(pool) {
          minimum_cash_reserve, monthly_billable_hours_per_professional, professional_count
        ) VALUES (
          $1, true, $2, $3, 'Configuración inicial de demostración', $4, $5, 'COP', 'Base',
-         0, 0.025, 0.06, 0.04, 0.05, 30, 30, 0,
+         0, 0.025, 0.02, 0.04, 0.05, 30, 30, 0,
          0.14, 0.35, 0.19, 0.00522,
          0.04, 0.04, 0.085, 0.12, 0.04, 0.02, 0.03, 0.0833,
          0.01, 0.0833, 0.0417, 0.18, 0, 120, 1

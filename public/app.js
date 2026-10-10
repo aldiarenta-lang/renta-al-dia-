@@ -48,7 +48,7 @@ const modules = [
   { id: 'cashflow', title: 'Flujo de caja', group: 'Análisis', icon: 'coins', description: 'Consulta cobros, salidas de caja y saldo mensual acumulado.' },
   { id: 'results', title: 'Estado de resultados', group: 'Análisis', icon: 'file', description: 'Consulta ingresos, costos, gastos, nómina y utilidad mensual.' },
   { id: 'taxes', title: 'Impuestos', group: 'Análisis', icon: 'calculator', description: 'Registra obligaciones, pagos y saldos, y consulta estimaciones tributarias calculadas con los datos guardados.' },
-  { id: 'forecast', title: 'Proyección Financiera', group: 'Análisis', icon: 'chart', description: 'Proyecta 36 meses a partir de promedios observados, tasas de crecimiento y parámetros financieros guardados.' },
+  { id: 'forecast', title: 'Proyección Financiera', group: 'Análisis', icon: 'chart', description: 'Mantiene seis meses históricos y proyecta desde julio hasta el Año 4 usando datos y supuestos guardados.' },
   { id: 'catalog-options', title: 'Catálogos', group: 'Configuración', icon: 'list', description: 'Mantén listas de opciones propias para facilitar el registro de la operación.' },
   { id: 'import-excel', title: 'Importar Excel', group: 'Administración', icon: 'file', description: 'Revisa, valida y migra las hojas del libro original a PostgreSQL.' }
 ];
@@ -120,7 +120,26 @@ const displayNames = {
   service_bonus_rate: 'Provisión de prima %', vacation_provision_rate: 'Provisión de vacaciones %',
   target_net_margin: 'Meta de margen neto %', minimum_cash_reserve: 'Reserva mínima de caja (COP)',
   monthly_billable_hours_per_professional: 'Horas facturables mensuales por profesional',
-  professional_count: 'Número de profesionales', cost_per_hour: 'Costo hora profesional calculado'
+  professional_count: 'Número de profesionales', cost_per_hour: 'Costo hora profesional calculado',
+  annual_client_growth: 'Crecimiento anual de clientes (%)', annual_salary_increase: 'Incremento salarial anual (%)',
+  annual_rent_increase: 'Incremento anual de arriendo (%)', annual_utilities_increase: 'Incremento anual de servicios (%)',
+  annual_advertising_increase: 'Incremento anual de publicidad (%)', annual_inflation: 'Inflación anual (%)',
+  discount_rate: 'Tasa de descuento (%)', office_rent_monthly: 'Arriendo mensual de oficina (COP)',
+  office_utilities_monthly: 'Energía y agua mensuales (COP)', office_internet_monthly: 'Internet mensual (COP)',
+  office_cleaning_monthly: 'Aseo mensual (COP)', office_cafeteria_monthly: 'Cafetería mensual (COP)',
+  office_stationery_monthly: 'Papelería mensual (COP)', office_maintenance_monthly: 'Mantenimiento mensual (COP)',
+  office_software_monthly: 'Software mensual (COP)', office_security_monthly: 'Seguridad mensual (COP)',
+  office_other_monthly: 'Otros gastos de oficina (COP)', projected_admin_salary: 'Salario auxiliar administrativa (COP)',
+  projected_admin_transport: 'Auxilio de transporte auxiliar administrativa (COP)',
+  projected_cleaning_salary: 'Salario auxiliar de servicios generales (COP)',
+  projected_cleaning_transport: 'Auxilio de transporte auxiliar de servicios generales (COP)',
+  advertising_year_1: 'Publicidad total Año 1 (COP)', advertising_year_2: 'Publicidad total Año 2 (COP)',
+  advertising_year_3: 'Publicidad total Año 3 (COP)',
+  opening_other_current_assets: 'Otros activos corrientes iniciales (COP)',
+  opening_noncurrent_assets: 'Activos no corrientes iniciales (COP)',
+  opening_current_liabilities: 'Pasivos corrientes iniciales (COP)',
+  opening_long_term_liabilities: 'Pasivos de largo plazo iniciales (COP)',
+  opening_equity: 'Patrimonio inicial (COP)'
 };
 
 const fieldSets = {
@@ -410,8 +429,11 @@ function chartSvg(labels, values, { accent = false, valuePrefix = '$' } = {}) {
   const plotTop = 18;
   const plotBottom = 190;
   const plotHeight = plotBottom - plotTop;
-  const maxValue = Math.max(0, ...values.map((value) => Number(value) || 0));
-  const scaleMax = maxValue || 1;
+  const numericValues = values.map((value) => Number(value) || 0);
+  const maxValue = Math.max(0, ...numericValues);
+  const minValue = Math.min(0, ...numericValues);
+  const scaleRange = maxValue - minValue || 1;
+  const zeroY = plotTop + maxValue / scaleRange * plotHeight;
   const slot = (width - plotLeft - 12) / Math.max(labels.length, 1);
   const barWidth = Math.min(22, slot * 0.72);
   const labelStep = Math.max(1, Math.ceil(labels.length / 12));
@@ -420,16 +442,17 @@ function chartSvg(labels, values, { accent = false, valuePrefix = '$' } = {}) {
     return `<line class="chart-guide" x1="${plotLeft}" y1="${y}" x2="${width - 8}" y2="${y}"/>`;
   }).join('');
   const bars = labels.map((label, index) => {
-    const value = Number(values[index]) || 0;
-    const heightValue = value === 0 ? 1 : Math.max(2, (value / scaleMax) * plotHeight);
+    const value = numericValues[index];
+    const heightValue = value === 0 ? 1 : Math.max(2, (Math.abs(value) / scaleRange) * plotHeight);
     const x = plotLeft + slot * index + (slot - barWidth) / 2;
-    const y = plotBottom - heightValue;
+    const y = value >= 0 ? zeroY - heightValue : zeroY;
     const shortLabel = String(label).split(' ').map((part) => part.slice(0, 3)).join(' ');
     const showLabel = index % labelStep === 0 || index === labels.length - 1;
     const aria = `${label}: ${formatMoney(value)}`;
     return `<g><title>${escapeHtml(aria)}</title><rect class="chart-bar${accent ? ' chart-bar-accent' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${heightValue.toFixed(1)}" rx="3"/>${showLabel ? `<text class="chart-label" x="${(x + barWidth / 2).toFixed(1)}" y="212" text-anchor="middle">${escapeHtml(shortLabel)}</text>` : ''}</g>`;
   }).join('');
-  const label = maxValue ? `${valuePrefix}${quantityFormat.format(maxValue)}` : 'Sin operaciones registradas';
+  const scaleLabel = Math.max(Math.abs(maxValue), Math.abs(minValue));
+  const label = scaleLabel ? `${valuePrefix}${quantityFormat.format(scaleLabel)}` : 'Sin operaciones registradas';
   return `<svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico de ingresos mensuales. Escala máxima ${escapeHtml(label)}">${guides}${bars}<text class="chart-value" x="${plotLeft}" y="11">${escapeHtml(label)}</text></svg>`;
 }
 
@@ -445,11 +468,33 @@ function renderDashboard(module, report) {
     return `${pageHeading(module, actions)}${configurationBanner()}${setupBlock()}`;
   }
   const metrics = [
-    metricCard('Ingresos netos reales', formatMoney(report.actualRevenue), 'Ventas completadas · primer trimestre', 'receipt'),
-    metricCard('Utilidad operacional real', formatMoney(report.actualProfit), `Primer trimestre · ${report.year}`, 'chart'),
-    metricCard('Servicios completados', formatNumber(report.completedServices), 'Cantidad ingresada · primer trimestre', 'people'),
-    metricCard('Caja proyectada a diciembre', formatMoney(report.endingCash), `Reserva mínima: ${formatMoney(report.minimumCashReserve)}`, 'cash')
+    metricCard('Ingresos netos reales', formatMoney(report.actualRevenue), 'Ventas completadas · enero a junio', 'receipt'),
+    metricCard('Utilidad operacional real', formatMoney(report.actualProfit), `Histórico enero–junio · ${report.year}`, 'chart'),
+    metricCard('Servicios completados', formatNumber(report.completedServices), 'Cantidad histórica · enero a junio', 'people'),
+    metricCard('Caja proyectada a 42 meses', formatMoney(report.endingCash), `Reserva mínima: ${formatMoney(report.minimumCashReserve)}`, 'cash')
   ].join('');
+  const indicators = report.strategicIndicators || {};
+  const strategicCards = [
+    reportCard('VPN / VAN', formatMoney(indicators.npv), 'Proyección descontada con la tasa configurada'),
+    reportCard('TIR', formatPercent(indicators.irr), 'Rentabilidad anual implícita'),
+    reportCard('PRI / Payback', indicators.paybackMonths === null ? '—' : `${formatNumber(indicators.paybackMonths)} meses`, indicators.paybackYears === null ? 'No recupera en el horizonte' : `${formatNumber(indicators.paybackYears)} años`),
+    reportCard('EBITDA histórico', formatMoney(indicators.ebitda), 'Enero a junio'),
+    reportCard('ROI histórico', formatPercent(indicators.roi), 'Utilidad neta / inversión registrada'),
+    reportCard('ROA proyectado', formatPercent(indicators.roa), 'Utilidad neta / activos totales'),
+    reportCard('ROE proyectado', formatPercent(indicators.roe), 'Utilidad neta / patrimonio'),
+    reportCard('Margen bruto histórico', formatPercent(indicators.grossMargin), 'Utilidad bruta / ventas'),
+    reportCard('Margen operacional histórico', formatPercent(indicators.operatingMargin), 'Utilidad operacional / ventas'),
+    reportCard('Margen neto histórico', formatPercent(indicators.netMargin), 'Utilidad neta / ventas'),
+    reportCard('Liquidez proyectada', formatNumber(indicators.currentRatio), 'Activo corriente / pasivo corriente'),
+    reportCard('Prueba ácida', formatNumber(indicators.quickRatio), 'Activos corrientes menos inventario / pasivo corriente'),
+    reportCard('Endeudamiento', formatPercent(indicators.debtRatio), 'Pasivos / activos'),
+    reportCard('Capital de trabajo', formatMoney(indicators.workingCapital), 'Saldo al cierre del Año 4')
+  ].join('');
+  const yearRows = (report.years || []).map((year) => [
+    String(year.year), formatMoney(year.revenue), formatMoney(year.netProfit),
+    formatPercent(year.netMargin), formatMoney(year.endingCash),
+    formatPercent(year.comparison?.revenueGrowth)
+  ]);
   const cashWarning = Number(report.endingCash) < Number(report.minimumCashReserve)
     ? configurationBanner(`El saldo final de caja estimado (${formatMoney(report.endingCash)}) está por debajo de la reserva mínima configurada (${formatMoney(report.minimumCashReserve)}).`)
     : '';
@@ -458,6 +503,9 @@ function renderDashboard(module, report) {
     : '';
   return `${pageHeading(module, actions)}${emptyNotice}${cashWarning}
     <div class="metric-grid">${metrics}</div>
+    <section class="card"><div class="card-heading"><div><h2>Indicadores Estratégicos</h2><p class="card-subtitle">Valores históricos al primer semestre y saldos proyectados a 42 meses</p></div></div><div class="report-cards">${strategicCards}</div></section>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Comparativo por año proyectado</h2><p class="card-subtitle">Año 1 corresponde a julio–diciembre; los años siguientes son períodos completos.</p></div></div>
+      ${renderReportTable(['Año', 'Ventas', 'Utilidad neta', 'Margen neto', 'Caja final', 'Crecimiento ventas'], yearRows)}</section>
     <div class="dashboard-grid">${chartCard('Ingresos netos por mes', `Ventas completadas · ${report.year}`, report.months, report.quarterlyRevenue)}
       <section class="card"><div class="card-heading"><div><h2>Plan de trabajo</h2><p class="card-subtitle">Accesos directos a la operación</p></div></div>
       <div class="card-body"><div class="activity-list">
@@ -468,9 +516,9 @@ function renderDashboard(module, report) {
       </div></div></section>
     </div>
     <div class="dashboard-lower">${chartCard('Utilidad operacional', `Estimación mensual · ${report.year}`, report.months, report.quarterlyProfit, true)}
-      <section class="card"><div class="card-heading"><div><h2>Resumen del ejercicio</h2><p class="card-subtitle">Proyección basada en los datos observados del primer trimestre</p></div></div>
+      <section class="card"><div class="card-heading"><div><h2>Resumen del ejercicio</h2><p class="card-subtitle">Información real de enero a junio y proyección desde julio</p></div></div>
       <div class="card-body"><div class="activity-list">
-        <div class="activity-item"><div class="activity-icon">${svg('chart')}</div><div><p class="activity-title">Ingresos proyectados a 12 meses</p><p class="activity-text">${formatMoney(report.projectedRevenue)} · incluye nueve meses estimados</p></div></div>
+        <div class="activity-item"><div class="activity-icon">${svg('chart')}</div><div><p class="activity-title">Ingresos históricos y proyectados</p><p class="activity-text">${formatMoney(report.projectedRevenue)} · seis meses reales y 42 meses proyectados</p></div></div>
         <div class="activity-item"><div class="activity-icon">${svg('coins')}</div><div><p class="activity-title">Inversión inicial registrada</p><p class="activity-text">${formatMoney(report.totalInvestments)}</p></div></div>
         <div class="activity-item"><div class="activity-icon">${svg('briefcase')}</div><div><p class="activity-title">Financiación y aportes registrados</p><p class="activity-text">${formatMoney(report.totalFinancing)}</p></div></div>
         <div class="activity-item"><div class="activity-icon">${svg('cost')}</div><div><p class="activity-title">Costo hora profesional calculado</p><p class="activity-text">${formatMoney(report.costPerHour)} · escenario ${escapeHtml(report.scenario)}</p></div></div>
@@ -669,16 +717,20 @@ function renderExcelImport(module) {
 function renderSummary(module, data) {
   if (!data.configured) return reportEmpty(module);
   const cards = [
-    reportCard('Ingresos reales · 3M', formatMoney(data.actualRevenue), 'Ventas completadas registradas'),
-    reportCard('Ingresos proyectados · 12M', formatMoney(data.projectedRevenue), 'Tres meses reales más nueve estimados'),
+    reportCard('Ingresos reales · 6M', formatMoney(data.actualRevenue), 'Ventas completadas registradas'),
+    reportCard('Ingresos proyectados · 42M', formatMoney(data.projectedRevenue), 'Seis meses reales más 42 estimados'),
     reportCard('Margen neto proyectado', formatPercent(data.projectedNetMargin), `Meta configurada: ${formatPercent(data.targetNetMargin)}`),
-    reportCard('Caja proyectada a diciembre', formatMoney(data.endingCash), `Ejercicio ${data.year}`),
+    reportCard('Caja proyectada al Año 4', formatMoney(data.endingCash), `Ejercicio ${data.year}`),
     reportCard('Servicios completados', formatNumber(data.completedServices), 'Ventas con estado completado'),
     reportCard('Financiación y aportes', formatMoney(data.totalFinancing), 'Registros de inversiones / financiación')
   ].join('');
   return `${pageHeading(module)}<div class="report-cards">${cards}</div>
-    <div class="dashboard-grid">${chartCard('Ingresos netos del primer trimestre', `Ventas completadas · ${data.year}`, data.months, data.quarterlyRevenue)}
-      ${chartCard('Utilidad operacional del primer trimestre', `Ingresos menos costos, gastos y nómina · ${data.year}`, data.months, data.quarterlyProfit, true)}</div>
+    <div class="dashboard-grid">${chartCard('Ingresos netos históricos', `Enero a junio · ${data.year}`, data.months, data.quarterlyRevenue)}
+      ${chartCard('Utilidad operacional histórica', `Ingresos menos costos, gastos y nómina · ${data.year}`, data.months, data.quarterlyProfit, true)}</div>
+    <div class="dashboard-grid" style="margin-top:16px">
+      ${chartCard('Ventas mensuales proyectadas', 'Julio del Año 1 a diciembre del Año 4', data.forecastSeries.map((row) => row.month), data.forecastSeries.map((row) => row.revenue))}
+      ${chartCard('Utilidad neta proyectada', 'Julio del Año 1 a diciembre del Año 4', data.forecastSeries.map((row) => row.month), data.forecastSeries.map((row) => row.netProfit), true)}
+    </div>
     <p class="report-note">La proyección utiliza los parámetros y operaciones guardados. No representa asesoría tributaria ni reemplaza la revisión contable.</p>`;
 }
 
@@ -715,21 +767,48 @@ function renderCashflow(module, data) {
     formatMoney(row.commercialExpenses + row.administrativeExpenses), formatMoney(row.taxPayment),
     formatMoney(row.investmentPayments), formatMoney(row.financingPayments), formatMoney(row.netCashFlow), formatMoney(row.endingCash)
   ]);
-  return `${pageHeading(module)}<div class="report-cards">${reportCard('Caja inicial del año', formatMoney(data.openingCash), 'Saldo guardado en parámetros')}${reportCard('Caja tras el primer trimestre', formatMoney(data.forecastStartingCash), 'Base de inicio para los nueve meses proyectados')}${reportCard('Caja proyectada a diciembre', formatMoney(data.forecast.at(-1)?.endingCash), 'Flujo de caja proyectado')}</div>
-    <section class="card"><div class="card-heading"><div><h2>Flujo real registrado</h2><p class="card-subtitle">Enero a diciembre · movimientos asociados a su fecha de registro</p></div></div>
+  return `${pageHeading(module)}<div class="report-cards">${reportCard('Caja inicial del año', formatMoney(data.openingCash), 'Saldo guardado en parámetros')}${reportCard('Caja al cierre del mes 6', formatMoney(data.forecastStartingCash), 'Cierre del semestre histórico')}${reportCard('Caja proyectada al Año 4', formatMoney(data.forecast.at(-1)?.endingCash), '42 meses de proyección desde julio')}</div>
+    <section class="card"><div class="card-heading"><div><h2>Flujo histórico registrado</h2><p class="card-subtitle">Enero a junio · movimientos asociados a su fecha de registro</p></div></div>
       ${renderReportTable(['Flujo de caja', ...data.months], rows)}</section>
-    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Flujo de caja proyectado</h2><p class="card-subtitle">Abril a diciembre · supuestos del ejercicio</p></div></div>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Flujo de caja proyectado</h2><p class="card-subtitle">Julio del Año 1 a diciembre del Año 4 · supuestos guardados</p></div></div>
       ${renderReportTable(['Mes', 'Cobros clientes', 'Financiación', 'Costos directos', 'Nómina neta', 'Aportes empleador', 'Gastos operativos', 'Impuestos', 'Inversiones', 'Cuotas créditos', 'Flujo neto', 'Saldo final'], projectedRows)}
-      <p class="report-note">La estimación usa el porcentaje de cobro del primer trimestre. El impuesto proyectado se paga en diciembre; los demás ingresos y egresos se asignan al mes proyectado.</p></section>`;
+      <p class="report-note">La estimación usa cobros observados en enero–junio. El impuesto proyectado se paga en diciembre de cada año; los demás ingresos y egresos se asignan al mes proyectado.</p></section>`;
 }
 
 function renderForecast(module, data) {
   if (!data.configured) return reportEmpty(module);
-  const yearGroups = [
-    { year: data.year, rows: data.rows.filter((row) => row.month.includes(String(data.year))) },
-    { year: data.year + 1, rows: data.rows.filter((row) => row.month.includes(String(data.year + 1))) },
-    { year: data.year + 2, rows: data.rows.filter((row) => row.month.includes(String(data.year + 2))) }
-  ];
+  const yearGroups = data.years.filter((year) => year.rows.length);
+  const indicators = data.strategicIndicators || {};
+  const annualSummary = data.years.map((year, index) => [
+    `${index === 0 ? 'Año 1' : `Año ${index + 1}`} · ${year.year}`,
+    formatMoney(year.revenue), formatMoney(year.grossProfit), formatMoney(year.ebitda),
+    formatMoney(year.netProfit), formatPercent(year.netMargin),
+    formatMoney(year.endingCash), formatPercent(year.comparison?.revenueGrowth)
+  ]);
+  const verticalRows = data.years.flatMap((year, index) => {
+    const revenue = Number(year.revenue);
+    const ratio = (value) => revenue > 0 ? formatPercent(Number(value) / revenue) : '—';
+    return [
+      [`Año ${index + 1} · ${year.year}`, 'Ventas netas', formatMoney(revenue), revenue > 0 ? '100%' : '—'],
+      ['', 'Costos directos', formatMoney(year.directCost), ratio(year.directCost)],
+      ['', 'Utilidad bruta', formatMoney(year.grossProfit), ratio(year.grossProfit)],
+      ['', 'Gastos operativos y comerciales', formatMoney(year.commercialExpenses + year.administrativeExpenses), ratio(year.commercialExpenses + year.administrativeExpenses)],
+      ['', 'EBITDA', formatMoney(year.ebitda), ratio(year.ebitda)],
+      ['', 'Resultado operacional', formatMoney(year.operatingProfit), ratio(year.operatingProfit)],
+      ['', 'Utilidad neta', formatMoney(year.netProfit), ratio(year.netProfit)]
+    ];
+  });
+  const scenarioRows = (data.scenarioSummaries || []).flatMap(({ scenario, years }) =>
+    years.map((year, index) => [
+      scenario,
+      `${index === 0 ? 'Año 1 (julio–diciembre)' : `Año ${index + 1}`} · ${year.year}`,
+      formatMoney(year.revenue),
+      formatMoney(year.directCost),
+      formatMoney(year.ebitda),
+      formatMoney(year.netProfit),
+      formatPercent(year.netMargin)
+    ])
+  );
 
   const renderYearTable = (yearRows) => {
     if (!yearRows.length) return '';
@@ -744,11 +823,38 @@ function renderForecast(module, data) {
     const totals = ['Total proyectado', ...['revenue', 'directCost', 'commercialExpenses', 'administrativeExpenses', 'payroll', 'ebitda', 'depreciation', 'operatingProfit', 'financeExpense', 'profitBeforeTax', 'incomeTax', 'netProfit'].map((key) =>
       formatMoney(yearRows.reduce((sum, row) => sum + Number(row[key]), 0))
     ), formatPercent(yearRows.at(-1)?.netMargin)];
-    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Estado de resultados proyectado · Año ${yearRows[0].month.split(' ').at(-1)}</h2><p class="card-subtitle">Resultados mensuales del año ${yearRows[0].month.split(' ').at(-1)}</p></div></div>
+    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h3>Estado de resultados proyectado</h3><p class="card-subtitle">Resultados mensuales de ${yearRows[0].year}</p></div></div>
       ${renderReportTable(
         ['Mes', 'Ventas netas', 'Costos directos', 'Gastos comerciales', 'Gastos administrativos', 'Nómina', 'Resultado antes de depreciación', 'Depreciación', 'Resultado operativo', 'Gastos financieros', 'Utilidad antes de impuestos', 'Impuesto estimado', 'Utilidad neta', 'Margen neto'],
         rows, { totalRows: [totals] }
-      )}</section>`;
+      )}
+      <h4>Detalle de nómina proyectada desde el mes 7</h4>
+      ${renderReportTable(['Cargo', 'Salario', 'Auxilio transporte', 'Salud', 'Pensión', 'ARL', 'Caja compensación', 'SENA', 'ICBF', 'Cesantías', 'Intereses cesantías', 'Prima', 'Vacaciones', 'Costo empleador'], [
+        ...[
+          ['Auxiliar administrativa', 'administrativeAssistant'],
+          ['Auxiliar de servicios generales', 'cleaningAssistant']
+        ].map(([label, key]) => {
+          const totals = yearRows.reduce((values, row) => {
+            const detail = row.payrollDetails[key];
+            for (const field of [
+              'salary', 'transport', 'employerHealth', 'employerPension', 'employerArl',
+              'familyCompensation', 'sena', 'icbf', 'severance', 'severanceInterest',
+              'serviceBonus', 'vacation', 'employerCost'
+            ]) values[field] += Number(detail[field]);
+            return values;
+          }, {
+            salary: 0, transport: 0, employerHealth: 0, employerPension: 0, employerArl: 0,
+            familyCompensation: 0, sena: 0, icbf: 0, severance: 0, severanceInterest: 0,
+            serviceBonus: 0, vacation: 0, employerCost: 0
+          });
+          return [label, ...[
+            totals.salary, totals.transport, totals.employerHealth, totals.employerPension,
+            totals.employerArl, totals.familyCompensation, totals.sena, totals.icbf,
+            totals.severance, totals.severanceInterest, totals.serviceBonus, totals.vacation,
+            totals.employerCost
+          ].map(formatMoney)];
+        })
+      ])}</section>`;
   };
 
   const renderYearCashTable = (yearRows) => {
@@ -759,22 +865,46 @@ function renderForecast(module, data) {
       formatMoney(row.expenses), formatMoney(row.taxPayment), formatMoney(row.financingPayments),
       formatMoney(row.netCashFlow), formatMoney(row.endingCash)
     ]);
-    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Flujo de caja proyectado · Año ${yearRows[0].month.split(' ').at(-1)}</h2><p class="card-subtitle">Cobros, pagos, impuestos y saldo mensual</p></div></div>
+    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h3>Flujo de caja proyectado</h3><p class="card-subtitle">Cobros, pagos, impuestos y saldo mensual</p></div></div>
       ${renderReportTable(
         ['Mes', 'Ventas netas', 'Cobros de clientes', 'Costos directos', 'Nómina neta', 'Aportes empleador', 'Gastos operativos', 'Impuestos pagados', 'Cuotas créditos', 'Flujo neto', 'Saldo final'],
         projectedCashRows
       )}</section>`;
   };
+  const renderYearBalance = (yearRows) => {
+    const balance = yearRows.at(-1);
+    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h3>Balance general proyectado al cierre</h3><p class="card-subtitle">${escapeHtml(String(balance.year))} · los saldos iniciales se toman de Parámetros</p></div></div>
+      ${renderReportTable(['Indicador', 'Valor'], [
+        ['Caja y bancos', formatMoney(balance.endingCash)],
+        ['Cuentas por cobrar estimadas', formatMoney(balance.receivables)],
+        ['Inventarios estimados', formatMoney(balance.inventory)],
+        ['Activo corriente', formatMoney(balance.currentAssets)],
+        ['Activo no corriente', formatMoney(balance.noncurrentAssets)],
+        ['Total activos', formatMoney(balance.totalAssets)],
+        ['Pasivo corriente', formatMoney(balance.currentLiabilities)],
+        ['Pasivo de largo plazo', formatMoney(balance.longTermLiabilities)],
+        ['Total pasivos', formatMoney(balance.totalLiabilities)],
+        ['Patrimonio', formatMoney(balance.equity)],
+        ['Diferencia de balance', formatMoney(balance.balanceDifference)]
+      ])}</section>`;
+  };
 
-  return `${pageHeading(module)}<div class="report-cards">${reportCard('Caja proyectada inicial', formatMoney(data.startingCash), 'Saldo estimado al cierre del último trimestre real')}${reportCard('Caja proyectada final', formatMoney(data.endingCash), 'Saldo acumulado a 36 meses')}</div>
+  return `${pageHeading(module)}<div class="report-cards">${reportCard('VPN / VAN', formatMoney(indicators.npv), 'Según la tasa de descuento configurada')}${reportCard('TIR', formatPercent(indicators.irr), 'Rentabilidad anual estimada')}${reportCard('Payback', indicators.paybackMonths === null ? '—' : `${formatNumber(indicators.paybackMonths)} meses`, indicators.paybackYears === null ? 'No recupera en 42 meses' : `${formatNumber(indicators.paybackYears)} años`)}${reportCard('Caja inicial proyectada', formatMoney(data.startingCash), 'Saldo real al cierre de junio')}${reportCard('Caja proyectada final', formatMoney(data.endingCash), 'Saldo acumulado al cierre del Año 4')}</div>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Comparativo anual · análisis horizontal</h2><p class="card-subtitle">El primer período cubre julio–diciembre; los años siguientes son períodos completos.</p></div></div>
+      ${renderReportTable(['Periodo', 'Ventas', 'Utilidad bruta', 'EBITDA', 'Utilidad neta', 'Margen neto', 'Caja final', 'Crecimiento ventas'], annualSummary)}</section>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Análisis vertical</h2><p class="card-subtitle">Cada concepto se compara contra las ventas del mismo año.</p></div></div>
+      ${renderReportTable(['Periodo', 'Concepto', 'Valor', '% de ventas'], verticalRows)}</section>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Escenarios financieros</h2><p class="card-subtitle">Ajustes configurables para ventas, costos directos y gastos en Parámetros.</p></div></div>
+      ${renderReportTable(['Escenario', 'Periodo', 'Ventas', 'Costos directos', 'EBITDA', 'Utilidad neta', 'Margen neto'], scenarioRows)}</section>
     ${yearGroups.map(({ year, rows: yearRows }) => `
       <section class="card" style="margin-top:16px">
-        <div class="card-heading"><div><h2>Proyección financiera · Año ${year}</h2><p class="card-subtitle">Horizonte anual de la proyección con datos reales y supuestos financieros</p></div></div>
+        <div class="card-heading"><div><h2>Proyección financiera · ${year === data.year ? 'Año 1 (julio–diciembre)' : `Año ${year - data.year + 1}`} · ${year}</h2><p class="card-subtitle">${yearRows.length} meses proyectados</p></div></div>
         ${renderYearTable(yearRows)}
         ${renderYearCashTable(yearRows)}
+        ${renderYearBalance(yearRows)}
       </section>
     `).join('')}
-    <p class="report-note" style="margin-top:16px">La proyección utiliza el promedio de ventas y costos directos del primer trimestre, los porcentajes mensuales/anuales guardados, la nómina registrada, depreciaciones y pagos financieros. No precarga ventas ni valores de ejemplo.</p>`;
+    <p class="report-note" style="margin-top:16px">Enero–junio se muestra como histórico separado. La proyección empieza en julio y cubre 42 meses hasta el Año 4. Los indicadores requieren completar los supuestos de oficina, salarios y saldos iniciales en Parámetros; los resultados no se almacenan.</p>`;
 }
 
 function renderTaxes(module, data, records, search = '') {
@@ -802,20 +932,41 @@ function renderBreakEven(module, data) {
   const revenue = data.monthlyBreakEvenRevenue === null ? '—' : formatMoney(data.monthlyBreakEvenRevenue);
   const cards = [
     reportCard('Costos fijos mensuales', formatMoney(data.fixedCosts), 'Gastos fijos mensuales equivalentes más nómina'),
-    reportCard('Servicios para equilibrio', units, 'Estimación mensual con el margen observado'),
-    reportCard('Ingresos estimados de equilibrio', revenue, 'Estimación basada en ingresos reales por servicio')
+    reportCard('Costos variables mensuales', formatMoney(data.variableCosts), 'Costos directos y gastos variables observados'),
+    reportCard('Margen de contribución', formatPercent(data.contributionMarginRate), 'Ventas menos costos variables / ventas'),
+    reportCard('Servicios mínimos', units, 'Servicios completados para cubrir costos fijos'),
+    reportCard('Clientes mínimos', formatNumber(data.breakEvenClients), 'Clientes activos equivalentes por mes'),
+    reportCard('Ventas mínimas necesarias', revenue, 'Ingreso requerido mensual al punto de equilibrio')
   ].join('');
   const details = [
+    ['Ingreso mensual requerido', formatMoney(data.monthlyIncomeRequired)],
     ['Ingreso medio por servicio', formatMoney(data.averageRevenuePerService)],
     ['Costo directo medio por servicio', formatMoney(data.averageDirectCostPerService)],
-    ['Margen de contribución por servicio', formatMoney(data.contributionPerService)]
+    ['Margen de contribución por servicio', formatMoney(data.contributionPerService)],
+    ['Ingreso medio por cliente (semestre)', formatMoney(data.averageRevenuePerClient)]
   ];
   const rows = details.map(([label, value]) => [escapeHtml(label), value]);
   const explanation = data.breakEvenServices === null
     ? configurationBanner('Aún no hay ventas completadas con margen de contribución positivo. Registra ventas y costos reales para calcular el equilibrio.')
     : '';
-  return `${pageHeading(module)}${explanation}<div class="report-cards">${cards}</div><section class="card">${renderReportTable(['Indicador', 'Valor', 'Periodo'], rows.map(([label, value]) => [label, value, escapeHtml(String(data.year))]))}
-    <p class="report-note">Cálculo basado en ventas completadas del ejercicio. El resultado es una estimación y no sustituye un análisis contable del negocio.</p></section>`;
+  const analysisRows = data.breakEvenSeries.map((row) => [
+    escapeHtml(row.month), formatMoney(row.revenue), formatMoney(row.costs),
+    formatMoney(row.revenue - row.costs), row.revenue >= row.costs ? 'Zona de utilidad' : 'Zona de pérdida'
+  ]);
+  const sensitivityRows = data.sensitivity.map((row) => [
+    escapeHtml(row.scenario), formatMoney(row.revenue), formatMoney(row.costs), formatMoney(row.breakEvenRevenue)
+  ]);
+  return `${pageHeading(module)}${explanation}<div class="report-cards">${cards}</div>
+    <section class="card">${renderReportTable(['Indicador', 'Valor', 'Periodo'], rows.map(([label, value]) => [label, value, 'Promedio mensual / semestre']))}</section>
+    <div class="dashboard-grid" style="margin-top:16px">
+      ${chartCard('Ingresos mensuales', 'Enero a junio · histórico', data.breakEvenSeries.map((row) => row.month), data.breakEvenSeries.map((row) => row.revenue))}
+      ${chartCard('Costos mensuales', 'Costos fijos y variables · histórico', data.breakEvenSeries.map((row) => row.month), data.breakEvenSeries.map((row) => row.costs), true)}
+    </div>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Zona de pérdidas y utilidad</h2><p class="card-subtitle">Comparación mensual de enero a junio; diferencia positiva indica utilidad y negativa indica pérdida.</p></div></div>
+      ${renderReportTable(['Mes', 'Ingresos', 'Costos totales', 'Resultado', 'Zona'], analysisRows)}</section>
+    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Análisis de sensibilidad</h2><p class="card-subtitle">Efecto de los incrementos de precio y costos directos configurados.</p></div></div>
+      ${renderReportTable(['Escenario parametrizado', 'Ventas mensuales', 'Costos mensuales', 'Ventas de equilibrio'], sensitivityRows)}
+      <p class="report-note">Los resultados parten de la operación real de enero a junio y de los porcentajes configurados. Revisa las tasas en Parámetros.</p></section>`;
 }
 
 function renderCatalogs(module, rows) {
@@ -853,9 +1004,74 @@ const settingsGroups = [
       { key: 'annual_price_increase', type: 'number', label: 'Incremento anual de precios (%)', required: true, min: -99.99, max: 1000, percent: true },
       { key: 'annual_direct_cost_growth', type: 'number', label: 'Crecimiento anual de costos directos (%)', required: true, min: -99.99, max: 1000, percent: true },
       { key: 'annual_expense_growth', type: 'number', label: 'Crecimiento anual de gastos (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'annual_client_growth', type: 'number', label: 'Crecimiento anual de clientes (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'annual_inflation', type: 'number', label: 'Inflación anual (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'annual_salary_increase', type: 'number', label: 'Incremento salarial anual (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'annual_rent_increase', type: 'number', label: 'Incremento anual de arriendo (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'annual_utilities_increase', type: 'number', label: 'Incremento anual de servicios públicos (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'annual_advertising_increase', type: 'number', label: 'Incremento anual de publicidad (%)', required: true, min: -99.99, max: 1000, percent: true },
+      { key: 'discount_rate', type: 'number', label: 'Tasa de descuento (%)', required: true, min: 0, max: 100, percent: true },
       { key: 'average_receivable_days', type: 'number', label: 'Días promedio de cartera', required: true, min: 0, max: 3650, step: 1 },
       { key: 'average_payable_days', type: 'number', label: 'Días promedio de proveedores', required: true, min: 0, max: 3650, step: 1 },
       { key: 'inventory_days', type: 'number', label: 'Días de inventario', required: true, min: 0, max: 3650, step: 1 }
+    ]
+  },
+  {
+    title: 'Ajustes por escenario',
+    description: 'Porcentajes adicionales sobre las ventas, costos directos y gastos calculados. Configura cada caso; el escenario seleccionado alimenta la proyección principal.',
+    fields: ['conservative', 'base', 'optimistic'].flatMap((scenario) => {
+      const label = scenario === 'conservative' ? 'Conservador' : scenario === 'optimistic' ? 'Optimista' : 'Base';
+      return [
+        { key: `scenario_${scenario}_revenue_adjustment`, type: 'number', label: `${label}: ajuste de ventas (%)`, required: true, min: -99.99, max: 1000, percent: true },
+        { key: `scenario_${scenario}_direct_cost_adjustment`, type: 'number', label: `${label}: ajuste de costos directos (%)`, required: true, min: -99.99, max: 1000, percent: true },
+        { key: `scenario_${scenario}_expense_adjustment`, type: 'number', label: `${label}: ajuste de gastos (%)`, required: true, min: -99.99, max: 1000, percent: true }
+      ];
+    })
+  },
+  {
+    title: 'Operación desde oficina (mes 7)',
+    description: 'Valores mensuales configurables; se aplican desde julio del año fiscal.',
+    fields: [
+      { key: 'office_rent_monthly', type: 'number', label: 'Arriendo mensual (COP)', required: true, min: 0 },
+      { key: 'office_utilities_monthly', type: 'number', label: 'Energía y agua mensuales (COP)', required: true, min: 0 },
+      { key: 'office_internet_monthly', type: 'number', label: 'Internet mensual (COP)', required: true, min: 0 },
+      { key: 'office_cleaning_monthly', type: 'number', label: 'Aseo mensual (COP)', required: true, min: 0 },
+      { key: 'office_cafeteria_monthly', type: 'number', label: 'Cafetería mensual (COP)', required: true, min: 0 },
+      { key: 'office_stationery_monthly', type: 'number', label: 'Papelería mensual (COP)', required: true, min: 0 },
+      { key: 'office_maintenance_monthly', type: 'number', label: 'Mantenimiento mensual (COP)', required: true, min: 0 },
+      { key: 'office_software_monthly', type: 'number', label: 'Software mensual (COP)', required: true, min: 0 },
+      { key: 'office_security_monthly', type: 'number', label: 'Seguridad mensual (COP)', required: true, min: 0 },
+      { key: 'office_other_monthly', type: 'number', label: 'Otros gastos de oficina (COP)', required: true, min: 0 }
+    ]
+  },
+  {
+    title: 'Personal proyectado desde el mes 7',
+    description: 'Salarios, auxilios y aportes usan las tasas de nómina configuradas abajo.',
+    fields: [
+      { key: 'projected_admin_salary', type: 'number', label: 'Salario auxiliar administrativa (COP)', required: true, min: 0 },
+      { key: 'projected_admin_transport', type: 'number', label: 'Auxilio de transporte auxiliar administrativa (COP)', required: true, min: 0 },
+      { key: 'projected_cleaning_salary', type: 'number', label: 'Salario auxiliar de servicios generales (COP)', required: true, min: 0 },
+      { key: 'projected_cleaning_transport', type: 'number', label: 'Auxilio de transporte auxiliar de servicios generales (COP)', required: true, min: 0 }
+    ]
+  },
+  {
+    title: 'Publicidad comercial',
+    description: 'Presupuesto total por año, distribuido en 12 meses de cada año proyectado.',
+    fields: [
+      { key: 'advertising_year_1', type: 'number', label: 'Publicidad Año 1 (COP)', required: true, min: 0 },
+      { key: 'advertising_year_2', type: 'number', label: 'Publicidad Año 2 (COP)', required: true, min: 0 },
+      { key: 'advertising_year_3', type: 'number', label: 'Publicidad Año 3 (COP)', required: true, min: 0 }
+    ]
+  },
+  {
+    title: 'Saldos de apertura al cierre del mes 6',
+    description: 'Estos valores son necesarios para estimar balance, liquidez, ROA y ROE. Registra los saldos de PostgreSQL/contabilidad.',
+    fields: [
+      { key: 'opening_other_current_assets', type: 'number', label: 'Otros activos corrientes al cierre del mes 6 (COP)', required: true, min: 0 },
+      { key: 'opening_noncurrent_assets', type: 'number', label: 'Activos no corrientes netos al cierre del mes 6 (COP)', required: true, min: 0 },
+      { key: 'opening_current_liabilities', type: 'number', label: 'Pasivos corrientes al cierre del mes 6 (COP)', required: true, min: 0 },
+      { key: 'opening_long_term_liabilities', type: 'number', label: 'Pasivos de largo plazo al cierre del mes 6 (COP)', required: true, min: 0 },
+      { key: 'opening_equity', type: 'number', label: 'Patrimonio al cierre del mes 6 (COP)', required: true }
     ]
   },
   {

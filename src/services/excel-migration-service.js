@@ -387,8 +387,10 @@ function extractRentaParameters(worksheet) {
     }
     values[field] = value;
   }
-  for (const field of Object.keys(settingsFields)) {
-    if (!found.has(field)) errors.push(`La hoja "${worksheet.name}" no contiene el parámetro requerido "${field}".`);
+  for (const [field, definition] of Object.entries(settingsFields)) {
+    if (definition.required && !found.has(field)) {
+      errors.push(`La hoja "${worksheet.name}" no contiene el parámetro requerido "${field}".`);
+    }
   }
   rows.push({ rowNumber: 5, values, errors: [] });
   return {

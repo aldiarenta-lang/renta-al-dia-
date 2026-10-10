@@ -52,7 +52,7 @@ test('la raíz y la ruta anterior del Dashboard cargan el mismo punto de entrada
   assert.match(script, /pathModules\.set\('\/dashboard',\s*'dashboard'\)/);
 });
 
-test('la proyección financiera se expone como módulo de tres años y la vista es legible', async () => {
+test('la proyección financiera conserva seis meses reales y cubre hasta el Año 4', async () => {
   const [rootResponse, scriptResponse] = await Promise.all([
     fetch(new URL('/', baseUrl)),
     fetch(new URL('/app.js', baseUrl))
@@ -62,7 +62,8 @@ test('la proyección financiera se expone como módulo de tres años y la vista 
 
   assert.equal(rootResponse.status, 200);
   assert.match(script, /Proyección Financiera/);
-  assert.match(script, /36 meses|Proyecta 36 meses/);
+  assert.match(script, /Julio del Año 1 a diciembre del Año 4/);
+  assert.match(script, /42 meses de proyección desde julio/);
   assert.match(script, /chart-label|chart-value/);
   assert.match(rootHtml, /id="operator-app"/);
 });

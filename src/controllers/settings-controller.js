@@ -22,7 +22,7 @@ export async function updateSettings(req, res) {
   const client = await pool.connect();
   try {
     const values = validateFields(req.body, settingsFields);
-    const fields = Object.keys(settingsFields);
+    const fields = Object.keys(values);
     const assignments = fields.map((field, index) => `${field} = $${index + 1}`).join(', ');
     await client.query('BEGIN');
     await client.query(
