@@ -48,7 +48,7 @@ const modules = [
   { id: 'cashflow', title: 'Flujo de caja', group: 'Análisis', icon: 'coins', description: 'Consulta cobros, salidas de caja y saldo mensual acumulado.' },
   { id: 'results', title: 'Estado de resultados', group: 'Análisis', icon: 'file', description: 'Consulta ingresos, costos, gastos, nómina y utilidad mensual.' },
   { id: 'taxes', title: 'Impuestos', group: 'Análisis', icon: 'calculator', description: 'Registra obligaciones, pagos y saldos, y consulta estimaciones tributarias calculadas con los datos guardados.' },
-  { id: 'forecast', title: 'Proyección a 9 meses', group: 'Análisis', icon: 'chart', description: 'Proyecta nueve meses a partir de promedios observados y tasas de crecimiento editables.' },
+  { id: 'forecast', title: 'Proyección Financiera', group: 'Análisis', icon: 'chart', description: 'Proyecta 36 meses a partir de promedios observados, tasas de crecimiento y parámetros financieros guardados.' },
   { id: 'catalog-options', title: 'Catálogos', group: 'Configuración', icon: 'list', description: 'Mantén listas de opciones propias para facilitar el registro de la operación.' },
   { id: 'import-excel', title: 'Importar Excel', group: 'Administración', icon: 'file', description: 'Revisa, valida y migra las hojas del libro original a PostgreSQL.' }
 ];
@@ -394,7 +394,7 @@ function renderInicio(module) {
       <section class="card"><div class="card-heading"><div><h2>Análisis</h2><p class="card-subtitle">Cálculos actualizados desde PostgreSQL</p></div></div>
       <div class="card-body"><div class="quick-links">
         <a class="quick-link" href="${pathForModule('results')}">${svg('file')} Estado de resultados</a><a class="quick-link" href="${pathForModule('cashflow')}">${svg('coins')} Flujo de caja</a>
-        <a class="quick-link" href="${pathForModule('break-even')}">${svg('scale')} Punto de equilibrio</a><a class="quick-link" href="${pathForModule('forecast')}">${svg('chart')} Proyección a 9 meses</a>
+        <a class="quick-link" href="${pathForModule('break-even')}">${svg('scale')} Punto de equilibrio</a><a class="quick-link" href="${pathForModule('forecast')}">${svg('chart')} Proyección Financiera</a>
       </div></div></section>
     </div>`;
 }
@@ -405,15 +405,16 @@ function metricCard(label, value, note, iconName) {
 
 function chartSvg(labels, values, { accent = false, valuePrefix = '$' } = {}) {
   const width = 680;
-  const height = 220;
+  const height = 240;
   const plotLeft = 42;
-  const plotTop = 14;
-  const plotBottom = 180;
+  const plotTop = 18;
+  const plotBottom = 190;
   const plotHeight = plotBottom - plotTop;
   const maxValue = Math.max(0, ...values.map((value) => Number(value) || 0));
   const scaleMax = maxValue || 1;
   const slot = (width - plotLeft - 12) / Math.max(labels.length, 1);
-  const barWidth = Math.min(28, slot * 0.48);
+  const barWidth = Math.min(22, slot * 0.72);
+  const labelStep = Math.max(1, Math.ceil(labels.length / 12));
   const guides = [0, .5, 1].map((ratio) => {
     const y = plotBottom - ratio * plotHeight;
     return `<line class="chart-guide" x1="${plotLeft}" y1="${y}" x2="${width - 8}" y2="${y}"/>`;
@@ -423,9 +424,10 @@ function chartSvg(labels, values, { accent = false, valuePrefix = '$' } = {}) {
     const heightValue = value === 0 ? 1 : Math.max(2, (value / scaleMax) * plotHeight);
     const x = plotLeft + slot * index + (slot - barWidth) / 2;
     const y = plotBottom - heightValue;
-    const shortLabel = String(label).slice(0, 3);
+    const shortLabel = String(label).split(' ').map((part) => part.slice(0, 3)).join(' ');
+    const showLabel = index % labelStep === 0 || index === labels.length - 1;
     const aria = `${label}: ${formatMoney(value)}`;
-    return `<g><title>${escapeHtml(aria)}</title><rect class="chart-bar${accent ? ' chart-bar-accent' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${heightValue.toFixed(1)}" rx="3"/><text class="chart-label" x="${(x + barWidth / 2).toFixed(1)}" y="202" text-anchor="middle">${escapeHtml(shortLabel)}</text></g>`;
+    return `<g><title>${escapeHtml(aria)}</title><rect class="chart-bar${accent ? ' chart-bar-accent' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${heightValue.toFixed(1)}" rx="3"/>${showLabel ? `<text class="chart-label" x="${(x + barWidth / 2).toFixed(1)}" y="212" text-anchor="middle">${escapeHtml(shortLabel)}</text>` : ''}</g>`;
   }).join('');
   const label = maxValue ? `${valuePrefix}${quantityFormat.format(maxValue)}` : 'Sin operaciones registradas';
   return `<svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico de ingresos mensuales. Escala máxima ${escapeHtml(label)}">${guides}${bars}<text class="chart-value" x="${plotLeft}" y="11">${escapeHtml(label)}</text></svg>`;
@@ -723,34 +725,56 @@ function renderCashflow(module, data) {
 
 function renderForecast(module, data) {
   if (!data.configured) return reportEmpty(module);
-  const rows = data.rows.map((row) => [
-    escapeHtml(row.month), formatMoney(row.revenue), formatMoney(row.directCost),
-    formatMoney(row.commercialExpenses), formatMoney(row.administrativeExpenses),
-    formatMoney(row.payroll), formatMoney(row.ebitda), formatMoney(row.depreciation),
-    formatMoney(row.operatingProfit), formatMoney(row.financeExpense),
-    formatMoney(row.profitBeforeTax), formatMoney(row.incomeTax), formatMoney(row.netProfit),
-    formatPercent(row.netMargin)
-  ]);
-  const totals = ['Total proyectado', ...['revenue', 'directCost', 'commercialExpenses', 'administrativeExpenses', 'payroll', 'ebitda', 'depreciation', 'operatingProfit', 'financeExpense', 'profitBeforeTax', 'incomeTax', 'netProfit'].map((key) =>
-    formatMoney(data.rows.reduce((sum, row) => sum + Number(row[key]), 0))
-  ), formatPercent(data.rows.at(-1)?.netMargin)];
-  const projectedCashRows = data.rows.map((row) => [
-    escapeHtml(row.month), formatMoney(row.revenue), formatMoney(row.customerReceipts),
-    formatMoney(row.directCostPayments), formatMoney(row.payrollNet), formatMoney(row.employerContributions),
-    formatMoney(row.expenses), formatMoney(row.taxPayment), formatMoney(row.financingPayments),
-    formatMoney(row.netCashFlow), formatMoney(row.endingCash)
-  ]);
-  return `${pageHeading(module)}<div class="report-cards">${reportCard('Caja proyectada inicial', formatMoney(data.startingCash), 'Saldo estimado al cierre de marzo')}${reportCard('Caja proyectada final', formatMoney(data.endingCash), 'Saldo estimado al cierre del ejercicio')}</div>
-    <section class="card"><div class="card-heading"><div><h2>Estado de resultados proyectado</h2><p class="card-subtitle">Los supuestos de crecimiento mensual y anual se aplican según el parámetro asociado.</p></div></div>
-    ${renderReportTable(
-    ['Mes', 'Ventas netas', 'Costos directos', 'Gastos comerciales', 'Gastos administrativos', 'Nómina', 'Resultado antes de depreciación', 'Depreciación', 'Resultado operativo', 'Gastos financieros', 'Utilidad antes de impuestos', 'Impuesto estimado', 'Utilidad neta', 'Margen neto'],
-    rows, { totalRows: [totals] }
-  )}</section>
-    <section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Flujo de caja proyectado</h2><p class="card-subtitle">Cobros, pagos, impuestos y saldo mensual</p></div></div>
-    ${renderReportTable(
-    ['Mes', 'Ventas netas', 'Cobros de clientes', 'Costos directos', 'Nómina neta', 'Aportes empleador', 'Gastos operativos', 'Impuestos pagados', 'Cuotas créditos', 'Flujo neto', 'Saldo final'],
-    projectedCashRows
-  )}<p class="report-note">La proyección utiliza el promedio de ventas y costos directos del primer trimestre, los porcentajes mensuales/anuales guardados, la nómina registrada, depreciaciones y pagos financieros. No precarga ventas ni valores de ejemplo.</p></section>`;
+  const yearGroups = [
+    { year: data.year, rows: data.rows.filter((row) => row.month.includes(String(data.year))) },
+    { year: data.year + 1, rows: data.rows.filter((row) => row.month.includes(String(data.year + 1))) },
+    { year: data.year + 2, rows: data.rows.filter((row) => row.month.includes(String(data.year + 2))) }
+  ];
+
+  const renderYearTable = (yearRows) => {
+    if (!yearRows.length) return '';
+    const rows = yearRows.map((row) => [
+      escapeHtml(row.month.split(' ')[0]), formatMoney(row.revenue), formatMoney(row.directCost),
+      formatMoney(row.commercialExpenses), formatMoney(row.administrativeExpenses),
+      formatMoney(row.payroll), formatMoney(row.ebitda), formatMoney(row.depreciation),
+      formatMoney(row.operatingProfit), formatMoney(row.financeExpense),
+      formatMoney(row.profitBeforeTax), formatMoney(row.incomeTax), formatMoney(row.netProfit),
+      formatPercent(row.netMargin)
+    ]);
+    const totals = ['Total proyectado', ...['revenue', 'directCost', 'commercialExpenses', 'administrativeExpenses', 'payroll', 'ebitda', 'depreciation', 'operatingProfit', 'financeExpense', 'profitBeforeTax', 'incomeTax', 'netProfit'].map((key) =>
+      formatMoney(yearRows.reduce((sum, row) => sum + Number(row[key]), 0))
+    ), formatPercent(yearRows.at(-1)?.netMargin)];
+    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Estado de resultados proyectado · Año ${yearRows[0].month.split(' ').at(-1)}</h2><p class="card-subtitle">Resultados mensuales del año ${yearRows[0].month.split(' ').at(-1)}</p></div></div>
+      ${renderReportTable(
+        ['Mes', 'Ventas netas', 'Costos directos', 'Gastos comerciales', 'Gastos administrativos', 'Nómina', 'Resultado antes de depreciación', 'Depreciación', 'Resultado operativo', 'Gastos financieros', 'Utilidad antes de impuestos', 'Impuesto estimado', 'Utilidad neta', 'Margen neto'],
+        rows, { totalRows: [totals] }
+      )}</section>`;
+  };
+
+  const renderYearCashTable = (yearRows) => {
+    if (!yearRows.length) return '';
+    const projectedCashRows = yearRows.map((row) => [
+      escapeHtml(row.month.split(' ')[0]), formatMoney(row.revenue), formatMoney(row.customerReceipts),
+      formatMoney(row.directCostPayments), formatMoney(row.payrollNet), formatMoney(row.employerContributions),
+      formatMoney(row.expenses), formatMoney(row.taxPayment), formatMoney(row.financingPayments),
+      formatMoney(row.netCashFlow), formatMoney(row.endingCash)
+    ]);
+    return `<section class="card" style="margin-top:16px"><div class="card-heading"><div><h2>Flujo de caja proyectado · Año ${yearRows[0].month.split(' ').at(-1)}</h2><p class="card-subtitle">Cobros, pagos, impuestos y saldo mensual</p></div></div>
+      ${renderReportTable(
+        ['Mes', 'Ventas netas', 'Cobros de clientes', 'Costos directos', 'Nómina neta', 'Aportes empleador', 'Gastos operativos', 'Impuestos pagados', 'Cuotas créditos', 'Flujo neto', 'Saldo final'],
+        projectedCashRows
+      )}</section>`;
+  };
+
+  return `${pageHeading(module)}<div class="report-cards">${reportCard('Caja proyectada inicial', formatMoney(data.startingCash), 'Saldo estimado al cierre del último trimestre real')}${reportCard('Caja proyectada final', formatMoney(data.endingCash), 'Saldo acumulado a 36 meses')}</div>
+    ${yearGroups.map(({ year, rows: yearRows }) => `
+      <section class="card" style="margin-top:16px">
+        <div class="card-heading"><div><h2>Proyección financiera · Año ${year}</h2><p class="card-subtitle">Horizonte anual de la proyección con datos reales y supuestos financieros</p></div></div>
+        ${renderYearTable(yearRows)}
+        ${renderYearCashTable(yearRows)}
+      </section>
+    `).join('')}
+    <p class="report-note" style="margin-top:16px">La proyección utiliza el promedio de ventas y costos directos del primer trimestre, los porcentajes mensuales/anuales guardados, la nómina registrada, depreciaciones y pagos financieros. No precarga ventas ni valores de ejemplo.</p>`;
 }
 
 function renderTaxes(module, data, records, search = '') {

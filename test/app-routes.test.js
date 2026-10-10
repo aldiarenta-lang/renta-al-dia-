@@ -52,6 +52,21 @@ test('la raíz y la ruta anterior del Dashboard cargan el mismo punto de entrada
   assert.match(script, /pathModules\.set\('\/dashboard',\s*'dashboard'\)/);
 });
 
+test('la proyección financiera se expone como módulo de tres años y la vista es legible', async () => {
+  const [rootResponse, scriptResponse] = await Promise.all([
+    fetch(new URL('/', baseUrl)),
+    fetch(new URL('/app.js', baseUrl))
+  ]);
+  const rootHtml = await rootResponse.text();
+  const script = await scriptResponse.text();
+
+  assert.equal(rootResponse.status, 200);
+  assert.match(script, /Proyección Financiera/);
+  assert.match(script, /36 meses|Proyecta 36 meses/);
+  assert.match(script, /chart-label|chart-value/);
+  assert.match(rootHtml, /id="operator-app"/);
+});
+
 test('la API no requiere sesión y reporta cuando falta configurar el contexto del operador', async () => {
   const response = await fetch(new URL('/api/unknown', baseUrl));
 

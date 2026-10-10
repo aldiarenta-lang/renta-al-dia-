@@ -176,6 +176,11 @@ export async function reportData(companyId) {
   }
   const average = (values, start = 0, end = 3) => values.slice(start, end).reduce((sum, value) => sum + value, 0) / (end - start);
   const growthMonthly = (rate) => Math.pow(1 + Number(rate), 1 / 12) - 1;
+  const renderForecastLabel = (monthIndex, yearOffset) => {
+    const monthName = months[monthIndex % 12];
+    const year = Number(config.fiscal_year) + yearOffset;
+    return `${monthName} ${year}`;
+  };
   const forecast = [];
   const revenueGrowth = Number(config.monthly_sales_growth);
   const directGrowth = growthMonthly(config.annual_direct_cost_growth);
@@ -188,8 +193,11 @@ export async function reportData(companyId) {
   const cashCollectionRate = firstQuarterRevenue > 0
     ? cashReceipts.slice(0, 3).reduce((sum, value) => sum + value, 0) / firstQuarterRevenue
     : 0;
-  for (let index = 3; index < 12; index += 1) {
-    const step = index - 2;
+  const forecastMonths = 36;
+  for (let index = 0; index < forecastMonths; index += 1) {
+    const step = index + 1;
+    const monthIndex = (3 + index) % 12;
+    const yearOffset = Math.floor((3 + index) / 12);
     const projectedRevenue = baseRevenue * Math.pow(1 + revenueGrowth, step);
     const projectedDirectCost = baseDirectCost * Math.pow(1 + directGrowth, step);
     const projectedCommercialExpense = baseCommercialExpense * Math.pow(1 + expenseGrowth, step);
@@ -200,10 +208,10 @@ export async function reportData(companyId) {
     const projectedFinanceExpense = monthlyFinanceExpense;
     const projectedProfitBeforeTax = projectedOperatingProfit - projectedFinanceExpense;
     const projectedIncomeTax = Math.max(0, projectedProfitBeforeTax) * Number(config.income_tax_rate);
-    const previousRevenue = index === 3 ? baseRevenue : forecast[index - 4].revenue;
+    const previousRevenue = index === 0 ? baseRevenue : forecast[index - 1].revenue;
     const customerReceipts = projectedRevenue * cashCollectionRate + previousRevenue * (1 - cashCollectionRate);
     forecast.push({
-      month: months[index],
+      month: renderForecastLabel(monthIndex, yearOffset),
       revenue: projectedRevenue,
       directCost: projectedDirectCost,
       commercialExpenses: projectedCommercialExpense,
@@ -224,13 +232,15 @@ export async function reportData(companyId) {
       payrollNet,
       employerContributions,
       investmentPayments: 0,
-      financingPayments: financingPayments[index]
+      financingPayments: financingPayments[monthIndex]
     });
   }
   const projectedTaxPayments = forecast.reduce((sum, row) => sum + row.incomeTax, 0);
+  const decemberProjectionCount = forecast.filter((row) => row.month.includes('Diciembre')).length || 1;
   let projectedCash = endingCash[2];
   for (const row of forecast) {
-    row.taxPayment = row.month === 'Diciembre' ? projectedTaxPayments : 0;
+    const monthName = row.month.split(' ')[0];
+    row.taxPayment = monthName === 'Diciembre' ? projectedTaxPayments / decemberProjectionCount : 0;
     const payments = row.directCostPayments + row.payrollNet + row.employerContributions
       + row.commercialExpenses + row.administrativeExpenses + row.taxPayment
       + row.investmentPayments + row.financingPayments;
